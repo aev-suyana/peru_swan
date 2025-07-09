@@ -25,12 +25,22 @@ import seaborn as sns
 import os
 
 # Import centralized configuration
+import sys
+import os
+
+# Add project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 try:
     from config import config, get_input_files, get_output_files
     print("✅ Using centralized configuration")
-except ImportError:
-    print("❌ Error: Cannot import config. Make sure config.py is in the same directory.")
-    print("Please run this script from the project root directory.")
+except ImportError as e:
+    print(f"❌ Error: Cannot import config: {e}")
+    print(f"Project root: {project_root}")
+    print(f"Looking for config.py at: {os.path.join(project_root, 'config.py')}")
+    print(f"Config exists: {os.path.exists(os.path.join(project_root, 'config.py'))}")
     exit(1)
 
 # ============================================================================
@@ -560,3 +570,37 @@ def main():
         
         df_waverys_daily_new_colnames.to_csv(os.path.join(output_dir, 'df_waverys_daily_new_colnames.csv'), index=False)
         print(f"✅ Saved: df_waverys_daily_new_colnames.csv ({df_waverys_daily_new_colnames.shape})")
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == "__main__":
+    """
+    Main execution when script is run directly
+    """
+    
+    print("🔧 DATA_PREPARATION_0.PY - Initial Processing")
+    
+    # Validate configuration
+    if not config.reference_port:
+        print(f"❌ Error: Invalid run configuration")
+        print(f"Current run_path: {config.RUN_PATH}")
+        print(f"Available runs: {list(config.RUN_TO_PORT_MAPPING.keys())}")
+        exit(1)
+    
+    # Run the processing
+    try:
+        main()
+        print("✅ data_preparation_0.py completed successfully!")
+    except Exception as e:
+        print(f"❌ data_preparation_0.py failed: {e}")
+        import traceback
+        traceback.print_exc()
+        exit(1)
+        
+else:
+    """
+    When imported by config.py, just run the main function
+    """
+    main()

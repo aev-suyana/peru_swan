@@ -37,7 +37,7 @@ class Config:
     LOGS_DIR = os.path.join(PROJECT_ROOT, 'logs')
     
     # Current run selection - CHANGE THIS TO SWITCH BETWEEN RUNS
-    RUN_PATH = 'run_G4_san_jose_to_eten'
+    RUN_PATH = 'run_G3_colan_to_bayovar'
     
     # Reference ports dictionary
     REFERENCE_PORTS = {

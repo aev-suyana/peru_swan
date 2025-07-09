@@ -130,23 +130,135 @@ def detrend_and_deseasonalize_reference_point(df_daily, apply_detrending=True, a
     return df_processed
 
 def create_enhanced_features_reference_point(df_processed, use_processed_features=True):
+    """
+    Create enhanced features on the reference point time series (full memory-efficient version)
+    """
+    import gc
+    import numpy as np
     print(f"\nSTEP 3: Enhanced feature engineering on reference point data")
-    df = df_processed.copy()
+    print(f"Input shape: {df_processed.shape}")
+    print(f"Use processed features: {use_processed_features}")
+    
+    df_enhanced = df_processed.copy()
+    df_enhanced['date'] = pd.to_datetime(df_enhanced['date'])
+    df_enhanced = df_enhanced.sort_values('date').reset_index(drop=True)
+    
+    # Choose features to enhance
     if use_processed_features:
-        base_features = [col for col in df.columns if col.endswith('_detrended')]
+        base_features = [col for col in df_enhanced.columns if col.endswith('_processed')]
+        feature_type = "processed"
     else:
-        base_features = [col for col in df.columns if col.startswith('swh') or col.startswith('swe')]
-    for window in [2, 3, 5, 7, 14]:
-        for feature in base_features:
-            df[f'{feature}_mean_{window}d'] = df[feature].rolling(window).mean()
-            df[f'{feature}_std_{window}d'] = df[feature].rolling(window).std()
-            df[f'{feature}_min_{window}d'] = df[feature].rolling(window).min()
-            df[f'{feature}_max_{window}d'] = df[feature].rolling(window).max()
-    for window in [1, 3, 5, 7, 14]:
-        for feature in base_features:
-            df[f'{feature}_lag_{window}d'] = df[feature].shift(window)
-    print(f"Enhanced features created: {len(df.columns)} total columns")
-    return df
+        base_features = [col for col in df_enhanced.columns if col.endswith('_raw')]
+        feature_type = "raw"
+    # Also include pct_ columns and other base features
+    additional_features = [col for col in df_enhanced.columns 
+                          if (col.startswith('pct_') or 
+                              (any(wave_type in col for wave_type in ['swh', 'swe']) 
+                               and not col.endswith(('_processed', '_raw'))))
+                          and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+    base_features.extend(additional_features)
+    base_features = list(set(base_features))  # Remove duplicates
+    print(f"Creating enhanced features from {len(base_features)} {feature_type} features...")
+    # Get valid features that exist in the dataframe
+    valid_base_features = [f for f in base_features if f in df_enhanced.columns]
+    if len(valid_base_features) == 0:
+        print("No valid base features found!")
+        return df_enhanced
+    # 3a: Memory-efficient persistence features
+    print("  Creating persistence features (memory-efficient)...")
+    PERSISTENCE_WINDOWS = [2, 3, 5, 7, 14]
+    TREND_WINDOWS = [3, 5, 7, 14]
+    CHANGE_WINDOWS = [3, 5, 7, 14]
+    LAG_WINDOWS = [1, 3, 5, 7, 14]
+    for window in PERSISTENCE_WINDOWS:
+        for feature in valid_base_features:
+            col_name = f'{feature}_persistence_{window}'
+            df_enhanced[col_name] = df_enhanced[feature].rolling(window, min_periods=1).mean()
+    gc.collect()
+    # 3b: Memory-efficient trend features
+    print("  Creating trend features (memory-efficient)...")
+    for window in TREND_WINDOWS:
+        for feature in valid_base_features:
+            mean_col = f'{feature}_rolling_mean_{window}'
+            df_enhanced[mean_col] = df_enhanced[feature].rolling(window, min_periods=2).mean()
+        print(f"    Computing slopes for window {window}...")
+        chunk_size = 10
+        for i in range(0, len(valid_base_features), chunk_size):
+            chunk_features = valid_base_features[i:i+chunk_size]
+            chunk_data = df_enhanced[chunk_features].values
+            n_rows, n_features = chunk_data.shape
+            slopes = np.full((n_rows, n_features), np.nan)
+            x = np.arange(window)
+            x_mean = x.mean()
+            x_centered = x - x_mean
+            x_var = np.sum(x_centered ** 2)
+            for row_idx in range(window-1, n_rows):
+                start_idx = row_idx - window + 1
+                y_window = chunk_data[start_idx:row_idx+1, :]
+                valid_mask = ~np.isnan(y_window).all(axis=0)
+                if valid_mask.any():
+                    y_valid = y_window[:, valid_mask]
+                    y_mean = np.nanmean(y_valid, axis=0)
+                    y_centered = y_valid - y_mean
+                    numerator = np.nansum(x_centered[:, np.newaxis] * y_centered, axis=0)
+                    slopes_valid = numerator / x_var
+                    slopes[row_idx, valid_mask] = slopes_valid
+            for j, feature in enumerate(chunk_features):
+                col_name = f'{feature}_trend_{window}'
+                df_enhanced[col_name] = slopes[:, j]
+        gc.collect()
+    # 3c: Memory-efficient change features
+    print("  Creating change features (memory-efficient)...")
+    for window in CHANGE_WINDOWS:
+        for feature in valid_base_features:
+            abs_change_col = f'{feature}_abs_change_{window}'
+            df_enhanced[abs_change_col] = df_enhanced[feature] - df_enhanced[feature].shift(window)
+            rel_change_col = f'{feature}_rel_change_{window}'
+            past_values = df_enhanced[feature].shift(window)
+            df_enhanced[rel_change_col] = np.where(past_values != 0,
+                                                  ((df_enhanced[feature] - past_values) / past_values) * 100,
+                                                  0)
+        gc.collect()
+    # 3d: Memory-efficient lag features
+    print("  Creating lag features (memory-efficient)...")
+    all_features_to_lag = valid_base_features.copy()
+    for feature in valid_base_features:
+        for window in PERSISTENCE_WINDOWS:
+            col_name = f'{feature}_persistence_{window}'
+            if col_name in df_enhanced.columns:
+                all_features_to_lag.append(col_name)
+        for window in TREND_WINDOWS:
+            for suffix in ['_trend_', '_rolling_mean_']:
+                col_name = f'{feature}{suffix}{window}'
+                if col_name in df_enhanced.columns:
+                    all_features_to_lag.append(col_name)
+        for window in CHANGE_WINDOWS:
+            for suffix in ['_abs_change_', '_rel_change_']:
+                col_name = f'{feature}{suffix}{window}'
+                if col_name in df_enhanced.columns:
+                    all_features_to_lag.append(col_name)
+    print(f"    Creating lags for {len(all_features_to_lag)} features...")
+    for lag in LAG_WINDOWS:
+        print(f"      Processing lag {lag}...")
+        chunk_size = 50
+        for i in range(0, len(all_features_to_lag), chunk_size):
+            chunk_features = all_features_to_lag[i:i+chunk_size]
+            valid_chunk_features = [f for f in chunk_features if f in df_enhanced.columns]
+            for feature in valid_chunk_features:
+                lag_col = f'{feature}_lag_{lag}'
+                df_enhanced[lag_col] = df_enhanced[feature].shift(lag)
+        gc.collect()
+    print("  Lag features complete!")
+    original_features = len(df_processed.columns)
+    enhanced_features = len(df_enhanced.columns)
+    new_features = enhanced_features - original_features
+    print(f"Enhanced feature engineering complete:")
+    print(f"  Original features: {original_features}")
+    print(f"  Enhanced features: {enhanced_features}")
+    print(f"  New features created: {new_features}")
+    print(f"  Output shape: {df_enhanced.shape}")
+    return df_enhanced
+
 
 def main():
     print("\n🔧 DATA_PREPARATION_1.PY - Enhanced Processing")

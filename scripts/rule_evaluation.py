@@ -623,7 +623,10 @@ def evaluate_rule_cv_with_thresholds(rule, df, cv_splits):
 # --- Main pipeline function ---
 def run_enhanced_cv_pipeline_fast(prediction_data):
     # Exclude non-feature columns and keep only numeric columns
-    exclude_cols = ['date', 'event_dummy_1', 'reference_port']  # add any other known non-features here
+    exclude_cols = [
+        'event_dummy_1', 'date', 'year', 'latitude', 'longitude', 'port_name',
+        'reference_port', 'duracion'
+    ]  # Exclude event-derived and non-predictive columns to prevent leakage
     candidate_features = [col for col in prediction_data.columns if col not in exclude_cols]
     # Keep only numeric columns
     numeric_features = prediction_data[candidate_features].select_dtypes(include=[np.number]).columns.tolist()
@@ -646,12 +649,15 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
     cv_splits = list(TimeSeriesSplit(n_splits=N_FOLDS).split(prediction_data))
     rules = create_enhanced_cv_rule_combinations(selected_features)
     cv_results = []
+    all_fold_thresholds = []
     for rule in rules:
-        cv_result, _ = evaluate_rule_cv_with_thresholds(rule, prediction_data, cv_splits)
+        cv_result, fold_thresholds = evaluate_rule_cv_with_thresholds(rule, prediction_data, cv_splits)
         if cv_result is not None:
             cv_results.append(cv_result)
+        if fold_thresholds is not None and isinstance(fold_thresholds, list) and len(fold_thresholds) > 0:
+            all_fold_thresholds.extend(fold_thresholds)
     cv_results_df = pd.DataFrame(cv_results)
-    return cv_results_df, voting_summary, selected_features
+    return cv_results_df, voting_summary, selected_features, all_fold_thresholds
 
 # --- MAIN EXECUTION ---
 def main():
@@ -673,7 +679,7 @@ def main():
 
     # Run enhanced CV pipeline
     print("\n🚦 Running enhanced CV pipeline...")
-    cv_results_df, voting_summary, selected_features = run_enhanced_cv_pipeline_fast(df)
+    cv_results_df, voting_summary, selected_features, all_fold_thresholds = run_enhanced_cv_pipeline_fast(df)
 
     # Save results
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -687,7 +693,15 @@ def main():
 
     if cv_results_df is not None and not cv_results_df.empty:
         cv_results_df.to_csv(results_path, index=False)
-        print(f"✅ Saved CV results: {results_path}")
+        print(f"✅ CV results saved: {results_path}")
+
+        # Save fold thresholds for downstream usage
+        fold_thresholds_path = os.path.join(output_dir, f'fold_thresholds_{timestamp}.csv')
+        if all_fold_thresholds and isinstance(all_fold_thresholds, list) and len(all_fold_thresholds) > 0:
+            pd.DataFrame(all_fold_thresholds).to_csv(fold_thresholds_path, index=False)
+            print(f"✅ Fold thresholds saved: {fold_thresholds_path}")
+        else:
+            print("⚠️  No fold thresholds found to save!")
     else:
         print("⚠️ No CV results to save.")
     if voting_summary is not None and not voting_summary.empty:

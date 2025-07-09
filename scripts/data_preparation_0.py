@@ -87,7 +87,7 @@ def load_swan_csv_data(csv_path):
     try:
         # Load the CSV
         df_swan = pd.read_csv(csv_path)
-        df_swan.rename(columns={'fecha': 'date', 'sea_wave_height': 'swh'}, inplace=True)
+        df_swan.rename(columns={'fecha': 'date', 'sea_wave_height': 'swh', 'time':'date'}, inplace=True)
         
         # Check required columns
         required_cols = ['date', 'swh']

@@ -1,0 +1,24 @@
+BEST LOGISTIC REGRESSION MODEL INFO
+========================================
+
+Feature Set: GLOBAL
+LR Variant: L2_Strong
+CV F1 Score: 0.587 ± 0.114
+Optimal Threshold: 0.394
+LR Parameters: {'penalty': 'l2', 'solver': 'lbfgs', 'max_iter': 2000, 'C': 0.1}
+Features (15):
+  - anom_swh_max_swan
+  - swh_mean_swan
+  - anom_swh_p75_deseasonalized
+  - anom_swh_p80_deseasonalized
+  - swh_median_deseasonalized_detrended
+  - swh_p60_deseasonalized_detrended
+  - anom_swh_p25_deseasonalized
+  - swh_p25_deseasonalized_detrended
+  - anom_swh_p75_abs_change_3
+  - swh_p80_swan
+  - anom_swh_median
+  - swh_mean_deseasonalized
+  - swh_p25_swan
+  - swh_p75_deseasonalized
+  - swh_median_swan

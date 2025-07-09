@@ -2984,6 +2984,15 @@ def main():
     if not cv_df.empty:
         cv_df.to_csv(rule_cv_path, index=False)
         print(f"✅ Rule CV results saved: {rule_cv_path}")
+
+    # Save per-fold thresholds for compatibility with AEP
+    fold_thresholds_path = os.path.join(config.results_output_dir, f'fold_thresholds_{config.RUN_PATH}.csv')
+    if all_fold_thresholds:
+        pd.DataFrame(all_fold_thresholds).to_csv(fold_thresholds_path, index=False)
+        print(f"✅ Fold thresholds saved: {fold_thresholds_path}")
+    else:
+        print("⚠️ No fold thresholds to save.")
+
     if isinstance(stable_rules, pd.DataFrame) and not stable_rules.empty:
         stable_rules.to_csv(stable_rules_path, index=False)
         print(f"✅ Stable rules saved: {stable_rules_path}")

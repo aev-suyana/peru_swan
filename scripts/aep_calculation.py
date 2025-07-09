@@ -550,6 +550,10 @@ def calculate_unified_aep_analysis_fast(swh_data, trigger_feature, trigger_thres
 
 # --- Helper: Find best single rule and mean threshold ---
 def load_best_single_rule_and_threshold(cv_results_path, folds_dir):
+    import pandas as pd
+    import numpy as np
+    import os
+
     cv_df = pd.read_csv(cv_results_path)
     single_rules = cv_df[cv_df['rule_type'] == 'single'].copy()
     if single_rules.empty:
@@ -559,22 +563,21 @@ def load_best_single_rule_and_threshold(cv_results_path, folds_dir):
     best_rule = single_rules.iloc[0]
     rule_name = best_rule['rule_name']
     feature = rule_name.replace(' > threshold', '').replace('Single: ', '').strip()
-    # Find latest fold_thresholds_*.csv in results directory
+
+    # Now get the mean threshold for this rule from fold_thresholds file
     fold_files = [f for f in os.listdir(folds_dir) if f.startswith('fold_thresholds_') and f.endswith('.csv')]
     if not fold_files:
         raise ValueError("No fold_thresholds_*.csv file found in results directory. Run rule_evaluation.py first.")
     latest_fold = sorted(fold_files)[-1]
     folds_df = pd.read_csv(os.path.join(folds_dir, latest_fold))
-    # Filter for the best rule's rule_name
     folds = folds_df[(folds_df['rule_type'] == 'single') & (folds_df['rule_name'] == rule_name)]
     if folds.empty:
         raise ValueError(f"No fold thresholds found for rule: {rule_name}")
-    # In wide format: threshold is in the column named after the feature
-    feature_col = feature
-    if feature_col in folds.columns:
-        threshold = folds[feature_col].mean()
+    # The threshold is in the column named after the feature
+    if feature in folds.columns:
+        threshold = np.nanmean(folds[feature].values)
     else:
-        raise ValueError(f"No threshold column for feature '{feature_col}' found in fold thresholds file. Columns are: {list(folds.columns)}")
+        raise ValueError(f"No threshold column for feature '{feature}' found in fold thresholds file. Columns are: {list(folds.columns)}")
     return feature, threshold
 
 # --- Helper: Plot rule condition (for validation) ---
@@ -610,7 +613,7 @@ def main():
     results_dir = config.results_output_dir
 
     # --- Locate latest CV results file ---
-    cv_files = [f for f in os.listdir(results_dir) if f.startswith('cv_results_') and f.endswith('.csv')]
+    cv_files = [f for f in os.listdir(results_dir) if (f == 'rule_cv_results.csv' or (f.startswith('cv_results_') and f.endswith('.csv')))]
     if not cv_files:
         print(f"❌ No CV results found in {results_dir}")
         return

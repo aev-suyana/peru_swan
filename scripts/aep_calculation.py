@@ -25,20 +25,162 @@ import gc
 
 # --- PARAMETERS ---
 ENABLE_PLOTTING = False  # Set True to enable validation plots
-# --- Economic parameters: dynamically load from wage data ---
-wage_path = os.path.join(config.RAW_DATA_DIR, 'df_wages_join.csv')
+# --- Economic parameters: dynamically load from wages_caleta.xlsx (full cleaning logic) ---
+wage_path = os.path.join(config.RAW_DATA_DIR, 'wages_caleta.xlsx')
 try:
-    df_wages = pd.read_csv(wage_path)
-    # Normalize port name for matching
-    port_name = config.reference_port.upper().replace(' ', '_')
-    row = df_wages[df_wages['port_name'].str.upper().str.replace(' ', '_') == port_name]
-    if not row.empty:
-        N_PARAM = float(row.iloc[0]['n_fishermen'])
-        W_PARAM = float(row.iloc[0]['daily_wages'])
+    df_wages = pd.read_excel(wage_path)
+    # Clean and normalize port names as in original script
+    df_wages.rename(columns={'port_name':'port_name_wages'}, inplace=True)
+    df_wages.rename(columns={'caleta':'port_name'}, inplace=True)
+    df_wages['port_name'] = df_wages['port_name'].str.upper()
+    df_wages['port_name'] = df_wages['port_name'].str.replace(' ', '_')
+    df_wages = df_wages[df_wages['port_name'] != 'PUERTO_SUPE']
+    df_wages['daily_wages'] = df_wages['w_p50']/30
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_EL_CHACO','CALETA_EL_CHACHO')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_CULEBRAS','COLETA_CULEBRAS')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_LOBITOS_(TALARA)','CALETA_LOBITOS')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_SAN_ANDRÉS','CALETA_SAN_ANDRES')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALLAO','DPA_CALLAO')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CHORRILLOS','DPA_CHORRILLOS')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('ENSENADA_DE_SECHURA','ENSENADA_SECHURA')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('PUERTO_MATARANI_(MUELLE_OCEAN_FISH)','MUELLE_OCEAN_FISH')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('PUNTA_PICATA', 'TERMINAL_PESQUERO_PUNTA_PICATA')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_EL_CHACO','CALETA_EL_CHACHO')
+    df_wages['n_ports'] = df_wages['port_name_wages'].apply(lambda x: len(x.split(',')))
+    df_wages['n_fishermen'] = round(df_wages['fishermen_province']/df_wages['n_ports'])
+    df_wages_join = df_wages[['port_name', 'daily_wages', 'n_fishermen']].reset_index(drop=True)
+    df_wages_join['daily_losses'] = df_wages_join['n_fishermen'] * df_wages_join['daily_wages']
+
+    avg_wages = df_wages_join['daily_wages'].median()
+    avg_fishermen = df_wages_join['n_fishermen'].median()
+    avg_losses = df_wages_join['daily_losses'].median()
+    # Add row for PUERTO_CHIMBOTE with mean values
+    chimbote_row = pd.DataFrame({
+        'port_name': ['PUERTO_CHIMBOTE'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+    coishco_row = pd.DataFrame({
+        'port_name': ['CALETA_COISHCO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    eldorado_row = pd.DataFrame({
+        'port_name': ['CALETA_EL_DORADO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    elnuro_row = pd.DataFrame({
+        'port_name': ['CALETA_EL_ÑURO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    santa_row = pd.DataFrame({
+        'port_name': ['CALETA_SANTA'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    ilo_row = pd.DataFrame({
+        'port_name': ['MUELLE_FISCAL_ILO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    callao_row = pd.DataFrame({
+        'port_name': ['DPA_CALLAO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    chorrillos_row = pd.DataFrame({
+        'port_name': ['DPA_CHORRILLOS'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    huarmey_row = pd.DataFrame({
+        'port_name': ['PUERTO_HUARMEY'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    samanco_row = pd.DataFrame({
+        'port_name': ['PUERTO_SAMANCO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    supe_row = pd.DataFrame({
+        'port_name': ['PUERTO_SUPE'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    multi_row = pd.DataFrame({
+        'port_name': ['TERMINAL_MULTIBOYAS'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    df_wages_join = pd.concat([df_wages_join, chimbote_row, coishco_row, eldorado_row, elnuro_row, santa_row, ilo_row, callao_row, chorrillos_row, huarmey_row, samanco_row, supe_row, multi_row], ignore_index=True)
+
+    # df_wages_join.to_csv(f'{path_out}/df_wages_join.csv')
+    wage_port_list = df_wages_join['port_name'].unique()
+    # --- Port group aggregation logic ---
+    run_path = config.RUN_PATH if hasattr(config, 'RUN_PATH') else 'UNKNOWN'
+    port_list = None
+    if run_path == '06_run_G1_puerto_pizarro_to_caleta_cancas':
+        port_list = ['CALETA_CANCAS', 'CALETA_GRAU', 'CALETA_ACAPULCO', 'CALETA_CRUZ', 'PUERTO_PIZARRO', 'PUERTO_ZORRITOS']
+    elif run_path == 'run_G2_punta_de_sal_to_cabo_blanco':
+        port_list = ['BALNEARIO_DE_PUNTA_SAL', 'CALETA_MANCORA', 'CALETA_LOS_ORGANOS', 'CALETA_NURO', 'CALETA_CABO_BLANCO']
+    elif run_path == 'run_G3_colan_to_bayovar':
+        port_list = ['CALETA_COLAN', 'PUERTO_BAYOVAR', 'CALETA_YACILLA', 'CALETA_ISLILLA', 'COLETA_TORTUGA', 'CALETA_CHULLILLACHE', 'CALETA_CONSTANTE', 'CALETA_MATACABALLO', 'CALETA_TIERRA_COLORADA', 'CALETA_DELICIAS', 'CALETA_PARACHIQUE', 'CALETA_PUERTO_RICO', 'PUERTO_PAITA', 'PUERTO_PAITA', 'ENSENADA_SECHURA']
+    elif run_path == 'run_G4_san_jose_to_eten':
+        port_list = ['CALETA_DE_SAN_JOSE', 'PUERTO_ETEN', 'PUERTO_PIMENTEL', 'CALETA_DE_SANTA_ROSA']
+    elif run_path == 'run_G4_ancon_to_callao':
+        port_list = ['ANCON', 'DPA_CALLAO', 'DPA_CHORRILLOS', 'PUCUSANA']
+    elif run_path == 'run_G5':
+        port_list = ['PUERTO_CHIMBOTE', 'CALETA_COISHCO', 'CALETA_DORADO', 'CALETA_ÑURO', 'CALETA_SANTA', 'CALETA_TORTUGAS', 'CALETA_CHIMUS', 'DPA_CHORRILLOS', 'PUERTO_HUARMEY', 'PUERTO_SAMANCO', 'PUERTO_CASMA', 'COLETA_CULEBRAS', 'CALETA_VIDAL', 'CALETA_GRAMITA']
+    elif run_path == 'run_G8':
+        port_list = ['CALETA_NAZCA', 'PUERTO_SAN_NICOLAS', 'PUERTO_SAN_JUAN', 'CALETA_LOMAS', 'CALETA_TANAKA', 'CALETA_PUERTO_VIEJO', 'CALETA_CHALA']
+    elif run_path == 'run_G9':
+        port_list = ['CALETA_ATICO', 'CALETA_PLANCHADA', 'CALETA_QUILCA', 'MUELLE_OCEAN_FISH', 'CALETA_FARO']
+    elif run_path == 'run_G10':
+        port_list = ['DPA_ILO', 'MUELLE_FISCAL_ILO', 'TERMINAL_PESQUERO_PUNTA_PICATA', 'DPA_MORRO_SAMA', 'DPA_VILA_VILA']
+    
+    if port_list is not None:
+        N_PARAM = df_wages_join[df_wages_join['port_name'].isin(port_list)]['n_fishermen'].sum()
+        # Use the same averaging formula as user: average daily_wages across group, then divide by 3.5
+        W_PARAM = (df_wages_join[df_wages_join['port_name'].isin(port_list)]['daily_wages'].sum()/len(port_list))/3.5
+        print(f"[AEP] Aggregated N_PARAM (fishermen): {N_PARAM}")
+        print(f"[AEP] Aggregated W_PARAM (wage): {W_PARAM}")
     else:
-        N_PARAM = 1
-        W_PARAM = 1
-        print(f"[AEP] Warning: Port '{port_name}' not found in wage data, using defaults.")
+        # Fallback: single port matching as before
+        port_name = config.reference_port.upper().replace(' ', '_')
+        row = df_wages_join[df_wages_join['port_name'] == port_name]
+        if not row.empty:
+            N_PARAM = float(row.iloc[0]['n_fishermen'])
+            W_PARAM = float(row.iloc[0]['daily_wages'])
+        else:
+            N_PARAM = 1
+            W_PARAM = 1
+            print(f"[AEP] Warning: Port '{port_name}' not found in wage data, using defaults.")
 except Exception as e:
     N_PARAM = 1
     W_PARAM = 1
@@ -479,6 +621,65 @@ def main():
     if aep_results is None:
         print("❌ AEP simulation failed.")
         return
+
+    # --- ML-BASED AEP SIMULATION (USING LOGISTIC REGRESSION PROBABILITIES) ---
+    print("\n🚀 Running ML-based AEP simulation (logistic regression probabilities)...")
+    # Path to ML probability file (update if needed)
+    ml_probs_path = os.path.join(
+        '/Users/ageidv/Library/CloudStorage/GoogleDrive-ageidv@gmail.com/My Drive/suyana/peru/Predictive Model',
+        'ML_probs_2024.csv'
+    )
+    if not os.path.exists(ml_probs_path):
+        print(f"❌ ML probabilities file not found: {ml_probs_path}")
+        ml_results = None
+    else:
+        ml_probs = pd.read_csv(ml_probs_path, parse_dates=['date'])
+        # Use calibrated_probability for ML AEP
+        if 'calibrated_probability' not in ml_probs.columns:
+            print("❌ 'calibrated_probability' column not found in ML probabilities file.")
+            ml_results = None
+        else:
+            # Merge ML probabilities with main df by date
+            df_ml = df.set_index('date').join(ml_probs.set_index('date')[['calibrated_probability']], how='left')
+            # Drop rows without ML probability
+            df_ml = df_ml.dropna(subset=['calibrated_probability'])
+            if len(df_ml) == 0:
+                print("❌ No overlapping dates between main data and ML probabilities.")
+                ml_results = None
+            else:
+                # Use the ML probability as the event trigger (continuous, not thresholded)
+                # Use the same economic params and simulation settings
+                ml_results = calculate_unified_aep_analysis_fast(
+                    df_ml,
+                    trigger_feature='calibrated_probability',
+                    trigger_threshold=None,  # Not used for probabilities
+                    N=N_PARAM,
+                    W=W_PARAM,
+                    min_days=MIN_DAYS,
+                    n_simulations=N_SIMULATIONS,
+                    observed_events=df_ml['event_dummy_1'] if 'event_dummy_1' in df_ml.columns else None,
+                    block_length=BLOCK_LENGTH,
+                    window_days=WINDOW_DAYS,
+                    n_jobs=-1
+                )
+                if ml_results is None:
+                    print("❌ ML-based AEP simulation failed.")
+                else:
+                    # Save ML results
+                    ml_summary_path = os.path.join(results_dir, f'ml_aep_summary_{timestamp}.csv')
+                    ml_curve_path = os.path.join(results_dir, f'ml_aep_curve_{timestamp}.csv')
+                    pd.DataFrame([ml_results['standard_summary']]).to_csv(ml_summary_path, index=False)
+                    pd.DataFrame(ml_results['standard_aep_curve']).to_csv(ml_curve_path, index=False)
+                    print(f"✅ Saved ML AEP summary: {ml_summary_path}")
+                    print(f"✅ Saved ML AEP curve: {ml_curve_path}")
+
+    # --- Print final comparison summary ---
+    print("\n===== FINAL AEP SIMULATION SUMMARY =====")
+    print(f"Rule-based method: mean annual loss = ${aep_results['standard_summary']['mean_loss']:,.0f}")
+    if ml_results is not None:
+        print(f"ML-based method: mean annual loss = ${ml_results['standard_summary']['mean_loss']:,.0f}")
+    else:
+        print("ML-based method: No results.")
 
     # --- Save results ---
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

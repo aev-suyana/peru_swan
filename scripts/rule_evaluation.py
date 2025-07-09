@@ -2977,6 +2977,10 @@ def main():
     # Define output paths
     rule_cv_path = os.path.join(config.results_output_dir, 'rule_cv_results.csv')
     stable_rules_path = os.path.join(config.results_output_dir, 'stable_rules.csv')
+
+    # Ensure output directory exists
+    os.makedirs(config.results_output_dir, exist_ok=True)
+
     if not cv_df.empty:
         cv_df.to_csv(rule_cv_path, index=False)
         print(f"✅ Rule CV results saved: {rule_cv_path}")

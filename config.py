@@ -23,7 +23,7 @@ class Config:
     PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
     
     # Local data directories
-    DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+    DATA_DIR = os.path.join(PROJECT_ROOT, 'wave_analysis_pipeline', 'data')
     RAW_DATA_DIR = os.path.join(DATA_DIR, 'raw')
     PROCESSED_DATA_DIR = os.path.join(DATA_DIR, 'processed')
     FINAL_DATA_DIR = os.path.join(DATA_DIR, 'final')

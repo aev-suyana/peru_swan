@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.ipynb_checkpoints/
+
+# Data files (keep structure, ignore content)
+data/raw/*
+data/processed/*
+data/final/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/final/.gitkeep
+
+# Results (keep structure, ignore content)
+results/cv_results/*
+results/rules/*
+results/aep/*
+!results/cv_results/.gitkeep
+!results/rules/.gitkeep
+!results/aep/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large files
+*.csv
+*.parquet
+*.xlsx
+*.nc
+*.hdf5

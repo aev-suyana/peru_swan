@@ -2038,6 +2038,68 @@ def domain_specific_selection(X_train, y_train, top_k=200):
     print(f"  ✅ Selected {len(selected_features)} features")
     return selected_features, domain_df
 
+# --- Enhanced Ensemble Voting for Feature Selection ---
+def enhanced_ensemble_voting(method_results, final_top_k=150):
+    """Enhanced ensemble voting system"""
+    print("🗳️ ENHANCED ENSEMBLE VOTING")
+    print("="*60)
+    feature_votes = {}
+    method_names = ['random_forest', 'extra_trees', 'mutual_info', 'f_test', 'domain_selection']
+    # Collect votes with enhanced scoring
+    for method_name, (features, scores_df) in zip(method_names, method_results):
+        if len(features) == 0:
+            continue
+        weight = EnhancedFeatureSelectionConfig.METHOD_WEIGHTS.get(method_name, 1.0)
+        print(f"📋 {method_name}: {len(features)} features, weight: {weight}")
+        for i, feature in enumerate(features):
+            position_score = np.exp(-i / len(features)) if len(features) > 0 else 0
+            if feature not in feature_votes:
+                feature_votes[feature] = {
+                    'total_score': 0,
+                    'method_count': 0,
+                    'methods': [],
+                    'positions': [],
+                    'best_position': float('inf')
+                }
+            feature_votes[feature]['total_score'] += position_score * weight
+            feature_votes[feature]['method_count'] += 1
+            feature_votes[feature]['methods'].append(method_name)
+            feature_votes[feature]['positions'].append(i + 1)
+            feature_votes[feature]['best_position'] = min(feature_votes[feature]['best_position'], i + 1)
+    # Filter by minimum votes
+    qualified_features = {}
+    for feature, info in feature_votes.items():
+        if info['method_count'] >= EnhancedFeatureSelectionConfig.MIN_VOTES:
+            if info['method_count'] == EnhancedFeatureSelectionConfig.MIN_VOTES:
+                print(f"[DEBUG] Feature '{feature}' just qualified with {info['method_count']} votes.")
+            qualified_features[feature] = info
+    print(f"✅ {len(qualified_features)} features qualified")
+    # Enhanced scoring
+    for feature, info in qualified_features.items():
+        consensus_score = info['method_count'] / len(method_names)
+        quality_score = info['total_score']
+        info['enhanced_score'] = quality_score * (1 + 0.2 * consensus_score)
+        info['consensus_score'] = consensus_score
+    # Sort by enhanced score
+    sorted_features = sorted(qualified_features.items(), 
+                           key=lambda x: x[1]['enhanced_score'], reverse=True)
+    final_features = [feature for feature, info in sorted_features[:final_top_k]]
+    # Create summary
+    voting_summary = []
+    for feature, info in sorted_features[:final_top_k]:
+        voting_summary.append({
+            'feature': feature,
+            'enhanced_score': info['enhanced_score'],
+            'method_count': info['method_count'],
+            'consensus_score': info['consensus_score'],
+            'methods': ', '.join(info['methods']),
+            'best_position': info['best_position'],
+            'avg_position': np.mean(info['positions'])
+        })
+    voting_df = pd.DataFrame(voting_summary)
+    print(f"🏆 ENHANCED SELECTION: {len(final_features)} features")
+    return final_features, voting_df
+
 # --- Enhanced Feature Selection Pipeline ---
 def enhanced_feature_selection_pipeline(X_train, y_train, top_k_per_method=200, final_top_k=150):
     """Complete enhanced feature selection pipeline"""
@@ -2170,6 +2232,47 @@ def create_enhanced_cv_rule_combinations(features, max_combinations=250):
     return rules
 
 # --- Enhanced Rule CV Evaluation Helper Functions ---
+
+def find_optimal_threshold(df_train, df_test, feature):
+    """Find threshold that maximizes F1 score for a feature"""
+    if feature not in df_test.columns or feature not in df_train.columns:
+        return None
+    train_feature = df_train[feature].dropna()
+    test_feature = df_test[feature].dropna()
+    if len(train_feature) < 5 or len(test_feature) < 5:
+        return None
+    if train_feature.std() < 1e-6:
+        return None
+    percentiles = list(range(10, 95, 5))  # 10% to 90% by 5%
+    try:
+        thresholds = [np.percentile(train_feature, p) for p in percentiles]
+        thresholds = sorted(list(set(thresholds)))
+    except:
+        return None
+    if len(thresholds) < 2:
+        return None
+    best_f1 = -1
+    best_threshold = None
+    y_true = df_test['event_dummy_1']
+    valid_predictions = 0
+    for threshold in thresholds:
+        try:
+            y_pred = (df_test[feature] > threshold).astype(int)
+            if y_pred.sum() == 0:
+                continue
+            accuracy = accuracy_score(y_true, y_pred)
+            if accuracy > 0.3:  # More lenient
+                f1 = f1_score(y_true, y_pred, zero_division=0)
+                valid_predictions += 1
+                if f1 > best_f1:
+                    best_f1 = f1
+                    best_threshold = threshold
+        except:
+            continue
+    if best_threshold is None and len(thresholds) > 0:
+        print(f"    DEBUG: Feature {feature[:30]}... - {len(thresholds)} thresholds tested, {valid_predictions} valid predictions, best_f1={best_f1:.3f}")
+    return best_threshold
+
 def evaluate_rule_cv_with_thresholds(rule, df, cv_splits):
     """CV evaluation with threshold tracking"""
     fold_results = []
@@ -2182,6 +2285,7 @@ def evaluate_rule_cv_with_thresholds(rule, df, cv_splits):
             if rule['type'] == 'single':
                 threshold = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature'])
                 if threshold is None:
+                    print(f"[DEBUG] Skipping fold {fold_idx} for rule {rule['name']} (no valid threshold found for {rule['feature']})")
                     continue
                 thresholds_used[rule['feature']] = threshold
                 y_pred_series = apply_single_condition(df_test_fold, rule['feature'], threshold)
@@ -2206,6 +2310,7 @@ def evaluate_rule_cv_with_thresholds(rule, df, cv_splits):
                 threshold2 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature2'])
                 threshold3 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature3'])
                 if any(t is None for t in [threshold1, threshold2, threshold3]):
+                    print(f"[DEBUG] Skipping fold {fold_idx} for rule {rule['name']} (no valid threshold for one of {rule['feature1']}, {rule['feature2']}, {rule['feature3']})")
                     continue
                 thresholds_used[rule['feature1']] = threshold1
                 thresholds_used[rule['feature2']] = threshold2
@@ -2241,6 +2346,7 @@ def evaluate_rule_cv_with_thresholds(rule, df, cv_splits):
                     **thresholds_used
                 })
         except Exception as e:
+            print(f"[DEBUG] Exception in fold {fold_idx} for rule {rule['name']}: {e}")
             continue
     # Aggregate results across folds
     if len(fold_results) == 0:
@@ -2308,6 +2414,13 @@ def run_cv_evaluation_with_threshold_tracking(rules, df, cv_splits):
             if result['f1_mean'] > best_f1_mean:
                 best_f1_mean = result['f1_mean']
                 print(f"  🎯 New best mean F1: {best_f1_mean:.3f} (±{result['f1_std']:.3f}) - {result['rule_name'][:50]}...")
+        else:
+            if result is None:
+                print(f"[DEBUG] Rule {rule['name']} excluded: no valid folds (all folds skipped or errored)")
+            elif result['n_folds_successful'] < 3:
+                print(f"[DEBUG] Rule {rule['name']} excluded: only {result['n_folds_successful']} valid folds (needs >= 3)")
+            elif result['f1_mean'] == 0:
+                print(f"[DEBUG] Rule {rule['name']} excluded: mean F1=0 over {result['n_folds_successful']} folds")
     return results, all_fold_thresholds
 
 # --- Enhanced Rule Evaluation Pipeline ---
@@ -2371,7 +2484,10 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
         df_train_combined = df.iloc[combined_train_idx]
         print(f"📊 Using {len(df_train_combined)} samples for feature selection...")
         # Prepare features
-        exclude_cols = ['date', 'port_name', 'event_dummy_1', 'total_obs']
+        exclude_cols = [
+            'date', 'port_name', 'event_dummy_1', 'total_obs',
+            'duracion', 'year', 'latitude', 'longitude'
+        ]
         feature_cols = [col for col in df.columns 
                        if col not in exclude_cols 
                        and df[col].dtype in ['float64', 'int64']]
@@ -2397,7 +2513,10 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
         print(f"❌ Enhanced feature selection failed: {e}")
         print("Falling back to quick correlation selection...")
         # Quick fallback
-        exclude_cols = ['date', 'port_name', 'event_dummy_1', 'total_obs']
+        exclude_cols = [
+            'date', 'port_name', 'event_dummy_1', 'total_obs',
+            'duracion', 'year', 'latitude', 'longitude'
+        ]
         all_features = [col for col in df.columns 
                        if col not in exclude_cols 
                        and df[col].dtype in ['float64', 'int64']]
@@ -2828,59 +2947,20 @@ def main():
 
     # Load merged features file (output of data_preparation_1.py)
     merged_path = os.path.join(config.run_output_dir, 'df_swan_waverys_merged.csv')
+    print(f"🔎 Looking for merged features at: {merged_path}")
     if not os.path.exists(merged_path):
         print(f"❌ Input file not found: {merged_path}")
         return
     df = pd.read_csv(merged_path)
     print(f"✅ Loaded merged features: {merged_path} ({df.shape})")
 
-    # Select features for ML (exclude metadata columns)
-    exclude_cols = ['date', 'port_name', 'event_dummy_1', 'year']
-    selected_features = [c for c in df.columns if c not in exclude_cols and not c.startswith('Unnamed')]
-
-    # --- ML Probability Prediction Output ---
-    # Save best logistic regression probabilities for 2024 data
-    ml_probs_path = os.path.join(config.results_output_dir, 'ML_probs_2024.csv')
-    print("\n🚦 Running and saving ML probability predictions for 2024 ...")
-    save_best_lr_predictions_2024(df, selected_features, output_path=ml_probs_path)
-    print(f"✅ ML probabilities saved: {ml_probs_path}")
-
-    print("\n🎉 Rule evaluation completed!")
-
-if __name__ == "__main__":
-    main()
-
+    # --- STEP 1: Feature Selection and Rule Evaluation ---
 # ============================================================================
-# END ENHANCED FEATURE SELECTION, RULE EVALUATION, AND ML PIPELINE FUNCTIONS
-# ============================================================================
-
-# --- MAIN EXECUTION ---
-def main():
-    print("\n🔧 RULE_EVALUATION.PY - CV Pipeline")
-    print(f"Run: {config.RUN_PATH}")
-    print(f"Reference port: {config.reference_port}")
-
-    # Get input and output paths
-    input_files = get_input_files()
-    output_files = get_output_files()
-
-    # Load merged features file (output of data_preparation_1.py)
-    merged_path = os.path.join(config.run_output_dir, 'df_swan_waverys_merged.csv')
-    if not os.path.exists(merged_path):
-        print(f"❌ Input file not found: {merged_path}")
-        return
-    df = pd.read_csv(merged_path)
-    print(f"✅ Loaded merged features: {merged_path} ({df.shape})")
-
-    # Select features for ML (exclude metadata columns)
-    exclude_cols = ['date', 'port_name', 'event_dummy_1', 'year']
-    selected_features = [c for c in df.columns if c not in exclude_cols and not c.startswith('Unnamed')]
-
-    # --- Enhanced Rule Evaluation Pipeline ---
-    rule_cv_path = os.path.join(config.results_output_dir, 'rule_cv_results.csv')
-    stable_rules_path = os.path.join(config.results_output_dir, 'stable_rules.csv')
     print("\n🚦 Running enhanced rule evaluation pipeline ...")
     cv_df, stable_rules, selected_features_rule, all_fold_thresholds = run_enhanced_cv_pipeline_fast(df)
+    # Define output paths
+    rule_cv_path = os.path.join(config.results_output_dir, 'rule_cv_results.csv')
+    stable_rules_path = os.path.join(config.results_output_dir, 'stable_rules.csv')
     if not cv_df.empty:
         cv_df.to_csv(rule_cv_path, index=False)
         print(f"✅ Rule CV results saved: {rule_cv_path}")
@@ -2889,7 +2969,7 @@ def main():
         print(f"✅ Stable rules saved: {stable_rules_path}")
     print("\n🚦 Running and saving ML probability predictions for 2024 ...")
     ml_probs_path = os.path.join(config.results_output_dir, 'ML_probs_2024.csv')
-    save_best_lr_predictions_2024(df, selected_features, output_path=ml_probs_path)
+    save_best_lr_predictions_2024(df, selected_features_rule, output_path=ml_probs_path)
     print(f"✅ ML probabilities saved: {ml_probs_path}")
 
     print("\n🎉 Rule evaluation completed!")

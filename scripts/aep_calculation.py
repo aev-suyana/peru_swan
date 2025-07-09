@@ -581,8 +581,11 @@ def main():
         return
     df = pd.read_csv(merged_path, parse_dates=['date'])
 
-    # --- Locate latest CV results file ---
+    # --- Set timestamp and results_dir for output files ---
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     results_dir = config.results_output_dir
+
+    # --- Locate latest CV results file ---
     cv_files = [f for f in os.listdir(results_dir) if f.startswith('cv_results_') and f.endswith('.csv')]
     if not cv_files:
         print(f"❌ No CV results found in {results_dir}")
@@ -682,14 +685,11 @@ def main():
         print("ML-based method: No results.")
 
     # --- Save results ---
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    results_dir = config.results_output_dir
     summary_path = os.path.join(results_dir, f'aep_summary_{timestamp}.csv')
     aep_curve_path = os.path.join(results_dir, f'aep_curve_{timestamp}.csv')
     # Save summary
     pd.DataFrame([aep_results['standard_summary']]).to_csv(summary_path, index=False)
-    print(f"✅ Saved AEP summary: {summary_path}")
-    # Save AEP curve
+    print(f"✅ Saved summary: {summary_path}")
     pd.DataFrame(aep_results['standard_aep_curve']).to_csv(aep_curve_path, index=False)
     print(f"✅ Saved AEP curve: {aep_curve_path}")
 

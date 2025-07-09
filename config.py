@@ -18,7 +18,7 @@ import importlib.util
 
 class Config:
     # AEP pipeline parameters
-    MIN_DAYS = 2
+    MIN_DAYS = 3
     N_SIMULATIONS = 4000
     BLOCK_LENGTH = 7
     WINDOW_DAYS = 20

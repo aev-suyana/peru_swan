@@ -42,7 +42,7 @@ class Config:
     LOGS_DIR = os.path.join(PROJECT_ROOT, 'logs')
     
     # Current run selection - CHANGE THIS TO SWITCH BETWEEN RUNS
-    RUN_PATH = 'run_g5'
+    RUN_PATH = 'run_g7'
 
     # Reference ports dictionary
     REFERENCE_PORTS = {
@@ -80,6 +80,7 @@ class Config:
     'run_g4': 'g4_wave_height.csv',
     'run_g5': 'g5_wave_height.csv',
     'run_g6': 'g6_wave_height.csv',
+    'run_g7': 'g7_wave_height.csv',
     'run_g8': 'g8_wave_height.csv',
     'run_g9': 'g9_wave_height.csv',
     'run_g10': 'g10_wave_height.csv',

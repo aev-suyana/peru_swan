@@ -37,7 +37,7 @@ class Config:
     LOGS_DIR = os.path.join(PROJECT_ROOT, 'logs')
     
     # Current run selection - CHANGE THIS TO SWITCH BETWEEN RUNS
-    RUN_PATH = 'run_G3_colan_to_bayovar'
+    RUN_PATH = 'run_G3'
     
     # Reference ports dictionary
     REFERENCE_PORTS = {
@@ -53,35 +53,31 @@ class Config:
         'PUERTO_DE_PIMENTEL': {'latitude': -6.837, 'longitude': -79.934, 'region': 'G4_san_jose_to_eten'},
     }
     
-    # Run to port mapping
+    # Simplified run to port mapping
     RUN_TO_PORT_MAPPING = {
-        'run_G3_colan_to_bayovar': 'CALETA_TIERRA_COLORADA',
-        'run_G2_punta_de_sal_to_cabo_blanco': 'CALETA_ORGANOS',
-        'run_G1_puerto_pizarro_to_caleta_cancas': 'CALETA_GRAU',
-        '06_run_G1_puerto_pizarro_to_caleta_cancas': 'CALETA_GRAU',
-        'run_G4_ancon_to_callao': 'ANCON',
-        'run_G4_san_jose_to_eten': 'PUERTO_ETEN',
-        'run_G5': 'DPA_CHORRILLOS',
-        'run_G8': 'CALETA_NAZCA',
-        'run_G9': 'CALETA_ATICO',
-        'run_G10': 'DPA_VILA_VILA',
-        'run_san_jose_to_eten_long_run': 'PUERTO_ETEN',
-    }
-    
-    # CSV file mapping (files should be in data/raw/)
+    'run_g1': 'CALETA_GRAU',
+    'run_g2': 'CALETA_ORGANOS',
+    'run_g3': 'CALETA_TIERRA_COLORADA',
+    'run_g4': 'ANCON',
+    'run_g5': 'DPA_CHORRILLOS',
+    'run_g6': 'PUERTO_ETEN',
+    'run_g8': 'CALETA_NAZCA',
+    'run_g9': 'CALETA_ATICO',
+    'run_g10': 'DPA_VILA_VILA',
+}
+
+    # Simplified CSV file mapping
     CSV_FILE_MAPPING = {
-        'run_G4_ancon_to_callao': 'g4_ancon_callao_wave_height.csv',
-        'run_G3_colan_to_bayovar': 'g3_colan_bayovar_wave_height.csv',
-        'run_G2_punta_de_sal_to_cabo_blanco': 'g2_punta_sal_cabo_blanco_wave_height.csv',
-        'run_G1_puerto_pizarro_to_caleta_cancas': 'g1_puerto_pizarro_cancas_wave_height.csv',
-        '06_run_G1_puerto_pizarro_to_caleta_cancas': 'g1_puerto_pizarro_cancas_wave_height.csv',
-        'run_G5': 'g5_wave_height.csv',
-        'run_G8': 'g8_wave_height.csv',
-        'run_G9': 'g9_wave_height.csv',
-        'run_G10': 'g10_wave_height.csv',
-        'run_G4_san_jose_to_eten': 'g4_wave_height.csv',
-        'run_san_jose_to_eten_long_run': 'g4_wave_height.csv',
-    }
+    'run_g1': 'g1_wave_height.csv',
+    'run_g2': 'g2_wave_height.csv',
+    'run_g3': 'g3_wave_height.csv',
+    'run_g4': 'g4_wave_height.csv',
+    'run_g5': 'g5_wave_height.csv',
+    'run_g6': 'g6_wave_height.csv',
+    'run_g8': 'g8_wave_height.csv',
+    'run_g9': 'g9_wave_height.csv',
+    'run_g10': 'g10_wave_height.csv',
+}
     
     # Feature engineering settings
     PERSISTENCE_WINDOWS = [2, 3, 5, 7, 14]
@@ -228,8 +224,8 @@ def run_complete_pipeline():
     print_configuration()
     
     pipeline_steps = [
-        ("data_prep_0.py", "Data Preparation Step 0 - Initial Processing"),
-        ("data_prep_1.py", "Data Preparation Step 1 - Enhanced Feature Engineering"), 
+        ("data_preparation_0.py", "Data Preparation Step 0 - Initial Processing"),
+        ("data_preparation_1.py", "Data Preparation Step 1 - Enhanced Feature Engineering"), 
         ("rule_evaluation.py", "Rule Evaluation - CV Pipeline and Feature Selection"),
         ("aep_calculation.py", "AEP Calculation - Final Analysis")
     ]

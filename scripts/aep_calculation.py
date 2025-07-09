@@ -145,25 +145,27 @@ try:
     # --- Port group aggregation logic ---
     run_path = config.RUN_PATH if hasattr(config, 'RUN_PATH') else 'UNKNOWN'
     port_list = None
-    if run_path == '06_run_G1_puerto_pizarro_to_caleta_cancas':
+    if run_path == 'run_g1':
         port_list = ['CALETA_CANCAS', 'CALETA_GRAU', 'CALETA_ACAPULCO', 'CALETA_CRUZ', 'PUERTO_PIZARRO', 'PUERTO_ZORRITOS']
-    elif run_path == 'run_G2_punta_de_sal_to_cabo_blanco':
+    elif run_path == 'run_g2':
         port_list = ['BALNEARIO_DE_PUNTA_SAL', 'CALETA_MANCORA', 'CALETA_LOS_ORGANOS', 'CALETA_NURO', 'CALETA_CABO_BLANCO']
-    elif run_path == 'run_G3_colan_to_bayovar':
+    elif run_path == 'run_g3':
         port_list = ['CALETA_COLAN', 'PUERTO_BAYOVAR', 'CALETA_YACILLA', 'CALETA_ISLILLA', 'COLETA_TORTUGA', 'CALETA_CHULLILLACHE', 'CALETA_CONSTANTE', 'CALETA_MATACABALLO', 'CALETA_TIERRA_COLORADA', 'CALETA_DELICIAS', 'CALETA_PARACHIQUE', 'CALETA_PUERTO_RICO', 'PUERTO_PAITA', 'PUERTO_PAITA', 'ENSENADA_SECHURA']
-    elif run_path == 'run_G4_san_jose_to_eten':
+    elif run_path == 'run_g4':
         port_list = ['CALETA_DE_SAN_JOSE', 'PUERTO_ETEN', 'PUERTO_PIMENTEL', 'CALETA_DE_SANTA_ROSA']
-    elif run_path == 'run_G4_ancon_to_callao':
+    elif run_path == 'run_g5':
         port_list = ['ANCON', 'DPA_CALLAO', 'DPA_CHORRILLOS', 'PUCUSANA']
-    elif run_path == 'run_G5':
+    elif run_path == 'run_g6':
         port_list = ['PUERTO_CHIMBOTE', 'CALETA_COISHCO', 'CALETA_DORADO', 'CALETA_ÑURO', 'CALETA_SANTA', 'CALETA_TORTUGAS', 'CALETA_CHIMUS', 'DPA_CHORRILLOS', 'PUERTO_HUARMEY', 'PUERTO_SAMANCO', 'PUERTO_CASMA', 'COLETA_CULEBRAS', 'CALETA_VIDAL', 'CALETA_GRAMITA']
-    elif run_path == 'run_G8':
+    elif run_path == 'run_g7':
         port_list = ['CALETA_NAZCA', 'PUERTO_SAN_NICOLAS', 'PUERTO_SAN_JUAN', 'CALETA_LOMAS', 'CALETA_TANAKA', 'CALETA_PUERTO_VIEJO', 'CALETA_CHALA']
-    elif run_path == 'run_G9':
+    elif run_path == 'run_g8':
         port_list = ['CALETA_ATICO', 'CALETA_PLANCHADA', 'CALETA_QUILCA', 'MUELLE_OCEAN_FISH', 'CALETA_FARO']
-    elif run_path == 'run_G10':
+    elif run_path == 'run_g9':
         port_list = ['DPA_ILO', 'MUELLE_FISCAL_ILO', 'TERMINAL_PESQUERO_PUNTA_PICATA', 'DPA_MORRO_SAMA', 'DPA_VILA_VILA']
-    
+    elif run_path == 'run_g10':
+        port_list = ['DPA_ILO', 'MUELLE_FISCAL_ILO', 'TERMINAL_PESQUERO_PUNTA_PICATA', 'DPA_MORRO_SAMA', 'DPA_VILA_VILA']
+
     if port_list is not None:
         N_PARAM = df_wages_join[df_wages_join['port_name'].isin(port_list)]['n_fishermen'].sum()
         # Use the same averaging formula as user: average daily_wages across group, then divide by 3.5
@@ -185,10 +187,6 @@ except Exception as e:
     N_PARAM = 1
     W_PARAM = 1
     print(f"[AEP] Warning: Could not load wage data: {e}. Using defaults.")
-MIN_DAYS = 3
-N_SIMULATIONS = 1000
-BLOCK_LENGTH = 7
-WINDOW_DAYS = 20
 
 # --- JIT and simulation functions (ported from legacy) ---
 from datetime import timedelta
@@ -346,7 +344,7 @@ def calculate_aep_curve_cm(costs, cost_type, trigger_feature, trigger_threshold,
     exceedance_prob = np.arange(1, len(costs_sorted)+1) / (len(costs_sorted)+1)
     return pd.DataFrame({'cost_type': cost_type, 'loss': costs_sorted, 'probability': exceedance_prob})
 
-def calculate_unified_aep_analysis_fast(swh_data, trigger_feature, trigger_threshold, N, W, min_days=3, n_simulations=100, observed_events=None, block_length=7, window_days=20, n_jobs=-1):
+def calculate_unified_aep_analysis_fast(swh_data, trigger_feature, trigger_threshold, N, W, min_days=None, n_simulations=None, observed_events=None, block_length=None, window_days=None, n_jobs=-1):
     print(f"🚀 SPEED-OPTIMIZED UNIFIED AEP ANALYSIS")
     print("=" * 50)
     print(f"  Data: {len(swh_data)} observations")
@@ -522,6 +520,20 @@ def calculate_unified_aep_analysis_fast(swh_data, trigger_feature, trigger_thres
         'standard_aep_curve': standard_aep_curve,
         'confusion_matrix_results': confusion_matrix_results
     }
+
+    # Observed yearly losses (if observed_events is provided)
+    obs_yearly_losses = None
+    if has_observed:
+        observed_aligned = observed_events.reindex(daily_clean.index, fill_value=0)
+        observed_years = daily_clean.index.year
+        obs_yearly_losses = {}
+        for year in np.unique(observed_years):
+            mask = (observed_years == year)
+            obs_loss = calculate_annual_loss_jit(observed_aligned.values[mask], N, W, min_days)
+            obs_yearly_losses[int(year)] = float(obs_loss)
+    if obs_yearly_losses is not None:
+        unified_results['obs_yearly_losses'] = obs_yearly_losses
+
     return unified_results
 
 # --- Helper: Find best single rule and mean threshold ---
@@ -614,11 +626,11 @@ def main():
         trigger_threshold=threshold,
         N=N_PARAM,
         W=W_PARAM,
-        min_days=MIN_DAYS,
-        n_simulations=N_SIMULATIONS,
+        min_days=config.MIN_DAYS,
+        n_simulations=config.N_SIMULATIONS,
         observed_events=observed_events,
-        block_length=BLOCK_LENGTH,
-        window_days=WINDOW_DAYS,
+        block_length=config.BLOCK_LENGTH,
+        window_days=config.WINDOW_DAYS,
         n_jobs=-1
     )
     if aep_results is None:
@@ -658,11 +670,11 @@ def main():
                     trigger_threshold=None,  # Not used for probabilities
                     N=N_PARAM,
                     W=W_PARAM,
-                    min_days=MIN_DAYS,
-                    n_simulations=N_SIMULATIONS,
+                    min_days=config.MIN_DAYS,
+                    n_simulations=config.N_SIMULATIONS,
                     observed_events=df_ml['event_dummy_1'] if 'event_dummy_1' in df_ml.columns else None,
-                    block_length=BLOCK_LENGTH,
-                    window_days=WINDOW_DAYS,
+                    block_length=config.BLOCK_LENGTH,
+                    window_days=config.WINDOW_DAYS,
                     n_jobs=-1
                 )
                 if ml_results is None:

@@ -143,3 +143,49 @@ scatter_anom_path = os.path.join(run_dir, 'scatter_anom_swh_max_swan_vs_waverys.
 plt.savefig(scatter_anom_path)
 print(f"✅ Saved plot: {scatter_anom_path}")
 plt.close()
+
+# --- PLOT 7: AEP curve with observed yearly losses overlay ---
+import glob
+import matplotlib.ticker as mticker
+import seaborn as sns
+
+curve_files = sorted(glob.glob(os.path.join(run_dir, 'aep_curve_*.csv')))
+obs_losses_files = sorted(glob.glob(os.path.join(run_dir, 'observed_yearly_losses_*.csv')))
+
+if curve_files:
+    aep_curve_path = curve_files[-1]
+    aep_curve = pd.read_csv(aep_curve_path)
+    plt.figure(figsize=(12, 7))
+    # AEP curve as smooth blue line
+    plt.plot(aep_curve['loss'], aep_curve['probability'], color='blue', lw=2.5, marker='o', markersize=3)
+    plt.xlabel('Loss ($)', fontsize=14)
+    plt.ylabel('Exceedance Probability', fontsize=14)
+    plt.title('Annual Exceedance Probability Curve', fontsize=16)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.ylim(0, 1)
+
+    # Overlay observed yearly losses
+    if obs_losses_files:
+        obs_path = obs_losses_files[-1]
+        obs_df = pd.read_csv(obs_path)
+        print('DEBUG: observed losses loaded:')
+        print(obs_df)
+        palette = sns.color_palette('tab10', n_colors=len(obs_df))
+        for idx, row in obs_df.iterrows():
+            plt.axvline(row['observed_loss'], color=palette[idx], linestyle='--', linewidth=3, alpha=0.8)
+            plt.text(row['observed_loss'], 0.98, str(row['year']), rotation=90, color=palette[idx], fontsize=16, ha='center', va='top', fontweight='bold')
+        # Median line
+        median_loss = obs_df['observed_loss'].median()
+        plt.axvline(median_loss, color='green', linestyle=':', linewidth=2.5)
+        plt.text(median_loss, 0.92, f'Median\n${median_loss/1000:.0f}K', color='green', fontsize=14, fontweight='bold', ha='center', va='top')
+
+    # Format x-axis as $X,XXXK
+    def k_fmt(x, pos):
+        return f'${int(x/1000):,}K'
+    plt.gca().xaxis.set_major_formatter(mticker.FuncFormatter(k_fmt))
+
+    plt.tight_layout()
+    out_path = os.path.join(run_dir, 'aep_with_observed_losses.png')
+    plt.savefig(out_path)
+    print(f"✅ Saved plot: {out_path}")
+    plt.close()

@@ -17,6 +17,11 @@ from datetime import datetime
 import importlib.util
 
 class Config:
+    # AEP pipeline parameters
+    MIN_DAYS = 2
+    N_SIMULATIONS = 4000
+    BLOCK_LENGTH = 7
+    WINDOW_DAYS = 20
     """Master configuration for the entire project"""
     
     # Base paths (local to repository)

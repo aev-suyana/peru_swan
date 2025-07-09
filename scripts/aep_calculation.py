@@ -693,6 +693,14 @@ def main():
     pd.DataFrame(aep_results['standard_aep_curve']).to_csv(aep_curve_path, index=False)
     print(f"✅ Saved AEP curve: {aep_curve_path}")
 
+    # --- Save observed yearly losses if available ---
+    obs_losses = aep_results.get('obs_yearly_losses', None)
+    if obs_losses is not None:
+        obs_losses_df = pd.DataFrame(list(obs_losses.items()), columns=['year', 'observed_loss'])
+        obs_losses_path = os.path.join(results_dir, f'observed_yearly_losses_{timestamp}.csv')
+        obs_losses_df.to_csv(obs_losses_path, index=False)
+        print(f"✅ Saved observed yearly losses: {obs_losses_path}")
+
     # --- Optional: Plot AEP curve ---
     if ENABLE_PLOTTING:
         plt.figure(figsize=(10, 6))

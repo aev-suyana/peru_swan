@@ -146,25 +146,37 @@ try:
     run_path = config.RUN_PATH if hasattr(config, 'RUN_PATH') else 'UNKNOWN'
     port_list = None
     if run_path == 'run_g1':
-        port_list = ['CALETA_CANCAS', 'CALETA_GRAU', 'CALETA_ACAPULCO', 'CALETA_CRUZ', 'PUERTO_PIZARRO', 'PUERTO_ZORRITOS']
+        port_list = ['CALETA_CANCAS', 'CALETA_GRAU', 'CALETA_ACAPULCO', 'CALETA_CRUZ', 
+                    'PUERTO_PIZARRO', 'PUERTO_ZORRITOS']
     elif run_path == 'run_g2':
-        port_list = ['BALNEARIO_DE_PUNTA_SAL', 'CALETA_MANCORA', 'CALETA_LOS_ORGANOS', 'CALETA_NURO', 'CALETA_CABO_BLANCO']
+        port_list = ['BALNEARIO_DE_PUNTA_SAL', 'CALETA_MANCORA', 'CALETA_LOS_ORGANOS', 'CALETA_NURO',
+                     'CALETA_CABO_BLANCO']
     elif run_path == 'run_g3':
-        port_list = ['CALETA_COLAN', 'PUERTO_BAYOVAR', 'CALETA_YACILLA', 'CALETA_ISLILLA', 'COLETA_TORTUGA', 'CALETA_CHULLILLACHE', 'CALETA_CONSTANTE', 'CALETA_MATACABALLO', 'CALETA_TIERRA_COLORADA', 'CALETA_DELICIAS', 'CALETA_PARACHIQUE', 'CALETA_PUERTO_RICO', 'PUERTO_PAITA', 'PUERTO_PAITA', 'ENSENADA_SECHURA']
+        port_list = ['CALETA_COLAN', 'PUERTO_BAYOVAR', 'CALETA_YACILLA', 'CALETA_ISLILLA', 
+                    'COLETA_TORTUGA', 'CALETA_CHULLILLACHE', 'CALETA_CONSTANTE', 'CALETA_MATACABALLO', 
+                    'CALETA_TIERRA_COLORADA', 'CALETA_DELICIAS', 'CALETA_PARACHIQUE', 'CALETA_PUERTO_RICO', 
+                    'PUERTO_PAITA', 'ENSENADA_SECHURA']
     elif run_path == 'run_g4':
         port_list = ['CALETA_DE_SAN_JOSE', 'PUERTO_ETEN', 'PUERTO_PIMENTEL', 'CALETA_DE_SANTA_ROSA']
     elif run_path == 'run_g5':
-        port_list = ['ANCON', 'DPA_CALLAO', 'DPA_CHORRILLOS', 'PUCUSANA']
+        port_list = ['PUERTO_CHIMBOTE', 'CALETA_COISHCO', 'CALETA_DORADO', 'CALETA_ÑURO', 
+                    'CALETA_SANTA', 'COLETA_CULEBRAS', 'CALETA_CHIMUS', 'PUERTO_HUARMEY', 
+                    'PUERTO_SAMANCO', 'PUERTO_CASMA', 'CALETA_VIDAL', 'CALETA_GRAMITA',
+                    'COLETA_TORTUGAS']
     elif run_path == 'run_g6':
-        port_list = ['PUERTO_CHIMBOTE', 'CALETA_COISHCO', 'CALETA_DORADO', 'CALETA_ÑURO', 'CALETA_SANTA', 'CALETA_TORTUGAS', 'CALETA_CHIMUS', 'DPA_CHORRILLOS', 'PUERTO_HUARMEY', 'PUERTO_SAMANCO', 'PUERTO_CASMA', 'COLETA_CULEBRAS', 'CALETA_VIDAL', 'CALETA_GRAMITA']
+        port_list = ['ANCON', 'DPA_CALLAO', 'DPA_CHORRILLOS', 'PUCUSANA']
     elif run_path == 'run_g7':
-        port_list = ['CALETA_NAZCA', 'PUERTO_SAN_NICOLAS', 'PUERTO_SAN_JUAN', 'CALETA_LOMAS', 'CALETA_TANAKA', 'CALETA_PUERTO_VIEJO', 'CALETA_CHALA']
+        port_list = ['CALETA_NAZCA', 'PUERTO_SAN_NICOLAS', 'PUERTO_SAN_JUAN', 'CALETA_LOMAS', 
+                    'CALETA_TANAKA', 'CALETA_PUERTO_VIEJO', 'CALETA_CHALA']
     elif run_path == 'run_g8':
-        port_list = ['CALETA_ATICO', 'CALETA_PLANCHADA', 'CALETA_QUILCA', 'MUELLE_OCEAN_FISH', 'CALETA_FARO']
+        port_list = ['CALETA_NAZCA', 'PUERTO_SAN_NICOLAS', 'PUERTO_SAN_JUAN', 'CALETA_LOMAS',
+                     'CALETA_TANAKA', 'CALETA_CHALA']
     elif run_path == 'run_g9':
-        port_list = ['DPA_ILO', 'MUELLE_FISCAL_ILO', 'TERMINAL_PESQUERO_PUNTA_PICATA', 'DPA_MORRO_SAMA', 'DPA_VILA_VILA']
+        port_list = ['CALETA_ATICO', 'CALETA_PLANCHADA', 'CALETA_QUILCA', 'MUELLE_OCEAN_FISH',
+                     'CALETA_FARO']
     elif run_path == 'run_g10':
-        port_list = ['DPA_ILO', 'MUELLE_FISCAL_ILO', 'TERMINAL_PESQUERO_PUNTA_PICATA', 'DPA_MORRO_SAMA', 'DPA_VILA_VILA']
+        port_list = ['DPA_ILO', 'MUELLE_FISCAL_ILO', 'TERMINAL_PESQUERO_PUNTA_PICATA', 'DPA_MORRO_SAMA', 
+                    'DPA_VILA_VILA']
 
     if port_list is not None:
         N_PARAM = df_wages_join[df_wages_join['port_name'].isin(port_list)]['n_fishermen'].sum()
@@ -635,58 +647,63 @@ def main():
     )
     if aep_results is None:
         print("❌ AEP simulation failed.")
-        return
-
-    # --- ML-BASED AEP SIMULATION (USING LOGISTIC REGRESSION PROBABILITIES) ---
-    print("\n🚀 Running ML-based AEP simulation (logistic regression probabilities)...")
-    # Path to ML probability file (update if needed)
-    ml_probs_path = os.path.join(
-        '/Users/ageidv/Library/CloudStorage/GoogleDrive-ageidv@gmail.com/My Drive/suyana/peru/Predictive Model',
-        'ML_probs_2024.csv'
-    )
-    if not os.path.exists(ml_probs_path):
-        print(f"❌ ML probabilities file not found: {ml_probs_path}")
+    # --- Robust: Find latest ML probabilities and threshold files ---
+    import glob
+    results_root = os.path.join(os.getcwd(), 'results', 'cv_results')
+    ml_probs_candidates = sorted(glob.glob(os.path.join(results_root, '**', 'ML_probs_2024.csv'), recursive=True), key=os.path.getmtime, reverse=True)
+    if not ml_probs_candidates:
+        print("❌ No ML_probs_2024.csv found in results/cv_results.")
         ml_results = None
     else:
-        ml_probs = pd.read_csv(ml_probs_path, parse_dates=['date'])
-        # Use calibrated_probability for ML AEP
-        if 'calibrated_probability' not in ml_probs.columns:
-            print("❌ 'calibrated_probability' column not found in ML probabilities file.")
+        ml_probs_path = ml_probs_candidates[0]
+        ml_probs_dir = os.path.dirname(ml_probs_path)
+        ml_threshold_path = os.path.join(ml_probs_dir, 'ML_probs_2024_optimal_threshold.txt')
+        print(f"✅ Using ML probabilities: {ml_probs_path}")
+        print(f"✅ Using ML optimal threshold: {ml_threshold_path}")
+
+        if not os.path.exists(ml_probs_path):
+            print(f"❌ ML probabilities file not found: {ml_probs_path}")
             ml_results = None
         else:
-            # Merge ML probabilities with main df by date
+            ml_probs = pd.read_csv(ml_probs_path, parse_dates=['date'])
             df_ml = df.set_index('date').join(ml_probs.set_index('date')[['calibrated_probability']], how='left')
-            # Drop rows without ML probability
             df_ml = df_ml.dropna(subset=['calibrated_probability'])
-            if len(df_ml) == 0:
-                print("❌ No overlapping dates between main data and ML probabilities.")
-                ml_results = None
+
+            # --- Load optimal ML threshold from file ---
+            if not os.path.exists(ml_threshold_path):
+                print(f"❌ ML optimal threshold file not found: {ml_threshold_path}")
+                print("    Please run rule_evaluation.py to generate this file.")
+                return
+            with open(ml_threshold_path, 'r') as f:
+                ml_trigger_threshold = float(f.read().strip())
+            print(f"✅ Loaded ML optimal threshold: {ml_trigger_threshold}")
+
+            ml_trigger_feature = 'calibrated_probability'
+
+            print(f"\n🚀 Running ML-based AEP simulation (logistic regression probabilities)...")
+            ml_results = calculate_unified_aep_analysis_fast(
+                df_ml,
+                trigger_feature=ml_trigger_feature,
+                trigger_threshold=ml_trigger_threshold,
+                N=N_PARAM,
+                W=W_PARAM,
+                min_days=config.MIN_DAYS,
+                n_simulations=config.N_SIMULATIONS,
+                observed_events=df_ml['event_dummy_1'] if 'event_dummy_1' in df_ml.columns else None,
+                block_length=config.BLOCK_LENGTH,
+                window_days=config.WINDOW_DAYS,
+                n_jobs=-1
+            )
+            if ml_results is None:
+                print("❌ ML-based AEP simulation failed.")
             else:
-                # Use the ML probability as the event trigger (continuous, not thresholded)
-                # Use the same economic params and simulation settings
-                ml_results = calculate_unified_aep_analysis_fast(
-                    df_ml,
-                    trigger_feature='calibrated_probability',
-                    trigger_threshold=None,  # Not used for probabilities
-                    N=N_PARAM,
-                    W=W_PARAM,
-                    min_days=config.MIN_DAYS,
-                    n_simulations=config.N_SIMULATIONS,
-                    observed_events=df_ml['event_dummy_1'] if 'event_dummy_1' in df_ml.columns else None,
-                    block_length=config.BLOCK_LENGTH,
-                    window_days=config.WINDOW_DAYS,
-                    n_jobs=-1
-                )
-                if ml_results is None:
-                    print("❌ ML-based AEP simulation failed.")
-                else:
-                    # Save ML results
-                    ml_summary_path = os.path.join(results_dir, f'ml_aep_summary_{timestamp}.csv')
-                    ml_curve_path = os.path.join(results_dir, f'ml_aep_curve_{timestamp}.csv')
-                    pd.DataFrame([ml_results['standard_summary']]).to_csv(ml_summary_path, index=False)
-                    pd.DataFrame(ml_results['standard_aep_curve']).to_csv(ml_curve_path, index=False)
-                    print(f"✅ Saved ML AEP summary: {ml_summary_path}")
-                    print(f"✅ Saved ML AEP curve: {ml_curve_path}")
+                # Save ML results
+                ml_summary_path = os.path.join(results_dir, f'ml_aep_summary_{timestamp}.csv')
+                ml_curve_path = os.path.join(results_dir, f'ml_aep_curve_{timestamp}.csv')
+                pd.DataFrame([ml_results['standard_summary']]).to_csv(ml_summary_path, index=False)
+                pd.DataFrame(ml_results['standard_aep_curve']).to_csv(ml_curve_path, index=False)
+                print(f"✅ Saved ML AEP summary: {ml_summary_path}")
+                print(f"✅ Saved ML AEP curve: {ml_curve_path}")
 
     # --- Print final comparison summary ---
     print("\n===== FINAL AEP SIMULATION SUMMARY =====")

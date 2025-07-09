@@ -2868,6 +2868,22 @@ def save_best_lr_predictions_2024(prediction_data, selected_features, output_pat
         'predicted_event': (calibrated_probabilities >= best_model_info['mean_threshold']).astype(int),
         'observed_event': data_2024['event_dummy_1'].values  # Always include observed events
     })
+
+    # Print confusion matrix for ML predictions using optimal threshold
+    from sklearn.metrics import confusion_matrix
+    cm = confusion_matrix(results_df['observed_event'], results_df['predicted_event'])
+    print(f"\n📊 2024 Confusion Matrix (Optimal Threshold={best_model_info['mean_threshold']:.3f}):")
+    print(f"                 Predicted")
+    print(f"                 0    1")
+    print(f"   Actual   0   {cm[0,0]:3d}  {cm[0,1]:3d}")
+    print(f"            1   {cm[1,0]:3d}  {cm[1,1]:3d}")
+    print(f"   TN={cm[0,0]}, FP={cm[0,1]}, FN={cm[1,0]}, TP={cm[1,1]}")
+
+    # Optionally, save the optimal threshold for downstream use
+    output_threshold_path = output_path.replace('.csv', '_optimal_threshold.txt')
+    with open(output_threshold_path, 'w') as f:
+        f.write(str(best_model_info['mean_threshold']))
+    print(f"Optimal threshold saved to: {output_threshold_path}")
     
     # Calculate performance metrics if observed events are available
     if 'event_dummy_1' in data_2024.columns:

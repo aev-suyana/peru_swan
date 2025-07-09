@@ -18,7 +18,7 @@ import importlib.util
 
 class Config:
     # AEP pipeline parameters
-    MIN_DAYS = 3
+    MIN_DAYS = 2
     N_SIMULATIONS = 4000
     BLOCK_LENGTH = 7
     WINDOW_DAYS = 20
@@ -43,19 +43,19 @@ class Config:
     
     # Current run selection - CHANGE THIS TO SWITCH BETWEEN RUNS
     RUN_PATH = 'run_g3'
-    
+
     # Reference ports dictionary
     REFERENCE_PORTS = {
-        'CALETA_TIERRA_COLORADA': {'latitude': -5.897, 'longitude': -80.681, 'region': 'G3_colan_to_bayovar'},
-        'CALETA_ORGANOS': {'latitude': -4.176, 'longitude': -81.127, 'region': 'G2_punta_de_sal_to_cabo_blanco'},
-        'CALETA_GRAU': {'latitude': -3.583, 'longitude': -80.733, 'region': 'G1_puerto_pizarro_to_caleta_cancas'},
-        'ANCON': {'latitude': -11.770, 'longitude': -77.180, 'region': 'G4_ancon_to_callao'},
-        'DPA_CHORRILLOS': {'latitude': -12.170, 'longitude': -77.020, 'region': 'G5'},
-        'CALETA_NAZCA': {'latitude': -14.830, 'longitude': -75.090, 'region': 'G8'},
-        'CALETA_ATICO': {'latitude': -16.226, 'longitude': -73.690, 'region': 'G9'},
-        'DPA_VILA_VILA': {'latitude': -17.700, 'longitude': -71.330, 'region': 'G10'},
-        'PUERTO_ETEN': {'latitude': -6.908, 'longitude': -79.864, 'region': 'G4_san_jose_to_eten'},
-        'PUERTO_DE_PIMENTEL': {'latitude': -6.837, 'longitude': -79.934, 'region': 'G4_san_jose_to_eten'},
+    'CALETA_GRAU': {'latitude': -3.583, 'longitude': -80.733, 'region': 'g1'},  # Original coordinates appear correct
+    'CALETA_ORGANOS': {'latitude': -4.176, 'longitude': -81.127, 'region': 'g2'},  # Original coordinates appear correct
+    'CALETA_TIERRA_COLORADA': {'latitude': -5.897, 'longitude': -80.681, 'region': 'g3'},  # Original coordinates appear correct
+    'PUERTO_ETEN': {'latitude': -6.933, 'longitude': -79.855, 'region': 'g4'},  # CORRECTED: Was -6.908, -79.864
+    'CALETA_GRAMITA': {'latitude': -6.908, 'longitude': -79.864, 'region': 'g5'},  # Original coordinates appear correct
+    'ANCON': {'latitude': -11.828, 'longitude': -77.131, 'region': 'g6'},  # CORRECTED: Was -11.770, -77.180
+    'CALETA_SAN_ANDRES': {'latitude': -13.710, 'longitude': -76.220, 'region': 'g8'},  # CORRECTED: Was -14.830, -75.090
+    'CALETA_NAZCA': {'latitude': -14.830, 'longitude': -75.090, 'region': 'g8'},  # Original coordinates appear correct for Nazca region
+    'CALETA_ATICO': {'latitude': -16.232, 'longitude': -73.612, 'region': 'g9'},  # CORRECTED: Was -16.226, -73.690
+    'DPA_VILA_VILA': {'latitude': -18.110, 'longitude': -70.726, 'region': 'g10'},  # CORRECTED: Was -17.700, -71.330
     }
     
     # Simplified run to port mapping
@@ -63,9 +63,10 @@ class Config:
     'run_g1': 'CALETA_GRAU',
     'run_g2': 'CALETA_ORGANOS',
     'run_g3': 'CALETA_TIERRA_COLORADA',
-    'run_g4': 'ANCON',
-    'run_g5': 'DPA_CHORRILLOS',
-    'run_g6': 'PUERTO_ETEN',
+    'run_g4': 'PUERTO_ETEN',
+    'run_g5': 'CALETA_GRAMITA',
+    'run_g6': 'ANCON',
+    'run_g7': 'CALETA_SAN_ANDRES',
     'run_g8': 'CALETA_NAZCA',
     'run_g9': 'CALETA_ATICO',
     'run_g10': 'DPA_VILA_VILA',

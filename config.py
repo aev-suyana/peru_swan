@@ -18,7 +18,7 @@ import importlib.util
 
 class Config:
     # AEP pipeline parameters
-    MIN_DAYS = 2
+    MIN_DAYS = 1
     N_SIMULATIONS = 4000
     BLOCK_LENGTH = 7
     WINDOW_DAYS = 20
@@ -42,7 +42,7 @@ class Config:
     LOGS_DIR = os.path.join(PROJECT_ROOT, 'logs')
     
     # Current run selection - CHANGE THIS TO SWITCH BETWEEN RUNS
-    RUN_PATH = 'run_g3'
+    RUN_PATH = 'run_g1'
 
     # Reference ports dictionary
     REFERENCE_PORTS = {

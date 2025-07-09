@@ -155,9 +155,10 @@ def main():
     puerto_coords = (config.REFERENCE_PORTS[reference_port]['latitude'], config.REFERENCE_PORTS[reference_port]['longitude'])
     run_path = config.RUN_PATH
     # Input/output paths
-    swan_daily_path = os.path.join(config.PROCESSED_DATA_DIR, 'df_swan_daily_enhanced.csv')
-    waverys_daily_path = os.path.join(config.PROCESSED_DATA_DIR, 'df_waverys_daily.csv')
-    output_dir = config.PROCESSED_DATA_DIR
+    run_dir = os.path.join(config.PROCESSED_DATA_DIR, run_path)
+    swan_daily_path = os.path.join(run_dir, 'df_swan_daily_enhanced.csv')
+    waverys_daily_path = os.path.join(run_dir, 'df_waverys_daily.csv')
+    output_dir = run_dir
     # Step 1: Load and validate
     df_swan_daily, df_waverys_daily = load_and_validate_daily_data(swan_daily_path, waverys_daily_path, reference_port)
     if df_swan_daily.empty or df_waverys_daily.empty:
@@ -169,6 +170,7 @@ def main():
     df_swan_features = create_enhanced_features_reference_point(df_swan_processed)
     # Step 4: Merge with WAVERYS
     print("\nSTEP 4: Merging with WAVERYS data")
+    df_swan_features['port_name'] = reference_port
     merged = pd.merge(df_swan_features, df_waverys_daily, on=['date', 'port_name'], suffixes=('_swan', '_waverys'), how='inner')
     print(f"Merged dataset shape: {merged.shape}")
     # Step 5: Save outputs

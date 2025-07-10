@@ -16,9 +16,13 @@ import numpy as np
 from datetime import datetime
 import importlib.util
 
+# Allow overriding RUN_PATH from environment variable
+RUN_PATH = os.environ.get('RUN_PATH', 'run_g10')  # fallback to default if not set
+MIN_DAYS = int(os.environ.get('MIN_DAYS', 1))  # ensure integer type
+
 class Config:
     # AEP pipeline parameters
-    MIN_DAYS = 1
+    MIN_DAYS = MIN_DAYS
     N_SIMULATIONS = 4000
     BLOCK_LENGTH = 7
     WINDOW_DAYS = 20
@@ -42,7 +46,7 @@ class Config:
     LOGS_DIR = os.path.join(PROJECT_ROOT, 'logs')
     
     # Current run selection - CHANGE THIS TO SWITCH BETWEEN RUNS
-    RUN_PATH = 'run_g10'
+    RUN_PATH = RUN_PATH
 
     # Reference ports dictionary
     REFERENCE_PORTS = {

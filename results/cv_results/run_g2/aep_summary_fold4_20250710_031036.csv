@@ -1,0 +1,2 @@
+mean_loss,std_loss,max_loss,zero_prob,method,block_length,window_days,trigger_feature,trigger_threshold,min_days,n_fishermen,daily_wage,n_simulations,n_jobs
+1042988.5959428572,351271.31238089525,2483582.5028571435,0.00025,speed_optimized_block_bootstrap,7,20,anom_swh_p25_deseasonalized_detrended_rolling_mean_14_lag_5,0.0631857787730522,1,2109.0,11.005714285714287,4000,12

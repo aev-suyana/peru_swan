@@ -572,6 +572,24 @@ def calculate_unified_aep_analysis_fast(swh_data, trigger_feature, trigger_thres
 
     return unified_results
 
+# --- Dual-condition rule parser ---
+def parse_dual_condition_rule(rule_str):
+    """
+    Parse a dual-condition rule string of the form:
+    'feature1 > t1 AND feature2 > t2' or 'feature1 > t1 OR feature2 > t2'
+    Returns (feature1, logic, feature2) where logic is 'AND' or 'OR'.
+    """
+    import re
+    # Regex to match: <feature1> > t1 <logic> <feature2> > t2
+    pattern = r"(.+?) > t1 (AND|OR) (.+?) > t2"
+    match = re.match(pattern, rule_str.strip())
+    if not match:
+        raise ValueError(f"Could not parse dual-condition rule: {rule_str}")
+    feature1 = match.group(1).strip()
+    logic = match.group(2).strip()
+    feature2 = match.group(3).strip()
+    return feature1, logic, feature2
+
 # --- Helper: Find best single rule and all thresholds ---
 def load_best_single_rule_and_all_thresholds(cv_results_path, folds_dir):
     import pandas as pd
@@ -719,17 +737,20 @@ def main():
                 obs_df.to_csv(obs_losses_path, index=False)
         if 'obs_yearly_losses' in aep_results:
             row = dict(threshold_label=label, threshold_value=thr)
+            row['W_param'] = W_PARAM
+            row['N_param'] = N_PARAM
+            row['min_days'] = config.MIN_DAYS
             row.update(aep_results['standard_summary'])
             # Add confusion matrix results for later summary table
             row['confusion_matrix_results'] = aep_results.get('confusion_matrix_results', None)
             # Add observed yearly losses if present
             if 'obs_yearly_losses' in aep_results:
-                row['obs_yearly_losses'] = aep_results['obs_yearly_losses']
+                row['observed_yearly_losses'] = aep_results['obs_yearly_losses']
             summary_rows.append(row)
 
     # --- Combined summary CSV for all thresholds ---
     if summary_rows:
-        all_summary_path = os.path.join(results_dir, f'aep_multi_threshold_summary_{timestamp}.csv')
+        all_summary_path = os.path.join(results_dir, f'aep_multi_threshold_summary_MIN_DAYS_{config.MIN_DAYS}_{timestamp}.csv')
         pd.DataFrame(summary_rows).to_csv(all_summary_path, index=False)
         print(f"\n✅ Saved all-threshold summary: {all_summary_path}")
 
@@ -842,6 +863,9 @@ def main():
             row = {
                 'variable': feature,
                 'run_path': config.RUN_PATH,
+                'W_param': W_PARAM,
+                'N_param': N_PARAM,
+                'min_days': config.MIN_DAYS,
                 'threshold_label': label,
                 'threshold_value': float(thr),
                 'mean_loss': mean_loss,
@@ -864,7 +888,7 @@ def main():
         float_cols = [k for k in summary_table_sorted[0].keys() if k != 'threshold_label']
         print(tabulate.tabulate(summary_table_sorted, headers="keys", floatfmt=(".3f",)+tuple([".2f"]*(len(float_cols)))))
         # Save to CSV
-        full_summary_path = os.path.join(results_dir, f'aep_multi_threshold_full_summary_{timestamp}.csv')
+        full_summary_path = os.path.join(results_dir, f'aep_multi_threshold_full_summary_MIN_DAYS_{config.MIN_DAYS}_{timestamp}.csv')
         pd.DataFrame(summary_table_sorted).to_csv(full_summary_path, index=False)
         print(f"\n✅ Saved full summary table: {full_summary_path}")
 
@@ -916,12 +940,14 @@ def main():
             else:
                 plt.title(str(plot_variable), fontsize=16)
             plt.tight_layout()
-            out_path = os.path.join(results_dir, f'aep_curve_best_threshold_{timestamp}.png')
+            out_path = os.path.join(results_dir, f'aep_curve_best_threshold_MIN_DAYS_{config.MIN_DAYS}_{timestamp}.png')
             plt.savefig(out_path)
             print(f"✅ Saved best AEP curve plot: {out_path}")
             plt.close()
 
     print("\n🎉 Multi-threshold AEP calculation completed!")
+
+
 
 if __name__ == "__main__":
     main()

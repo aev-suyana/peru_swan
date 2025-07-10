@@ -1,0 +1,2 @@
+mean_loss,std_loss,max_loss,zero_prob,method,block_length,window_days,trigger_feature,trigger_threshold,min_days,n_fishermen,daily_wage,n_simulations,n_jobs
+73697.94742857142,11711.560333912337,120173.71428571426,0.0,speed_optimized_block_bootstrap,7,20,duration_intensity_p60_waverys,17.35,1,124.0,9.142857142857142,4000,12

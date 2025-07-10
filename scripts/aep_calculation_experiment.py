@@ -1,0 +1,927 @@
+"""
+AEP CALCULATION - FINAL PIPELINE STAGE
+======================================
+
+This script loads the best single-feature rule and threshold from CV results
+and runs the unified AEP analysis and plotting using the production pipeline structure.
+
+Author: Wave Analysis Team
+Date: 2025
+"""
+
+import os
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import matplotlib.pyplot as plt
+from config import config, get_input_files, get_output_files
+
+# Import numba, tqdm, etc. as in the legacy script
+from tqdm.auto import tqdm
+from numba import jit, prange
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import gc
+
+# --- PARAMETERS ---
+ENABLE_PLOTTING = False  # Set True to enable validation plots
+# --- Economic parameters: dynamically load from wages_caleta.xlsx (full cleaning logic) ---
+wage_path = os.path.join(config.RAW_DATA_DIR, 'wages_caleta.xlsx')
+try:
+    df_wages = pd.read_excel(wage_path)
+    # Clean and normalize port names as in original script
+    df_wages.rename(columns={'port_name':'port_name_wages'}, inplace=True)
+    df_wages.rename(columns={'caleta':'port_name'}, inplace=True)
+    df_wages['port_name'] = df_wages['port_name'].str.upper()
+    df_wages['port_name'] = df_wages['port_name'].str.replace(' ', '_')
+    df_wages = df_wages[df_wages['port_name'] != 'PUERTO_SUPE']
+    df_wages['daily_wages'] = df_wages['w_p50']/30
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_EL_CHACO','CALETA_EL_CHACHO')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_CULEBRAS','COLETA_CULEBRAS')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_LOBITOS_(TALARA)','CALETA_LOBITOS')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_SAN_ANDRÉS','CALETA_SAN_ANDRES')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALLAO','DPA_CALLAO')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CHORRILLOS','DPA_CHORRILLOS')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('ENSENADA_DE_SECHURA','ENSENADA_SECHURA')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('PUERTO_MATARANI_(MUELLE_OCEAN_FISH)','MUELLE_OCEAN_FISH')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('PUNTA_PICATA', 'TERMINAL_PESQUERO_PUNTA_PICATA')
+    df_wages['port_name'] = df_wages['port_name'].str.replace('CALETA_EL_CHACO','CALETA_EL_CHACHO')
+    df_wages['n_ports'] = df_wages['port_name_wages'].apply(lambda x: len(x.split(',')))
+    df_wages['n_fishermen'] = round(df_wages['fishermen_province']/df_wages['n_ports'])
+    df_wages_join = df_wages[['port_name', 'daily_wages', 'n_fishermen']].reset_index(drop=True)
+    df_wages_join['daily_losses'] = df_wages_join['n_fishermen'] * df_wages_join['daily_wages']
+
+    avg_wages = df_wages_join['daily_wages'].median()
+    avg_fishermen = df_wages_join['n_fishermen'].median()
+    avg_losses = df_wages_join['daily_losses'].median()
+    # Add row for PUERTO_CHIMBOTE with mean values
+    chimbote_row = pd.DataFrame({
+        'port_name': ['PUERTO_CHIMBOTE'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+    coishco_row = pd.DataFrame({
+        'port_name': ['CALETA_COISHCO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    eldorado_row = pd.DataFrame({
+        'port_name': ['CALETA_EL_DORADO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    elnuro_row = pd.DataFrame({
+        'port_name': ['CALETA_EL_ÑURO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    santa_row = pd.DataFrame({
+        'port_name': ['CALETA_SANTA'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    ilo_row = pd.DataFrame({
+        'port_name': ['MUELLE_FISCAL_ILO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    callao_row = pd.DataFrame({
+        'port_name': ['DPA_CALLAO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    chorrillos_row = pd.DataFrame({
+        'port_name': ['DPA_CHORRILLOS'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    huarmey_row = pd.DataFrame({
+        'port_name': ['PUERTO_HUARMEY'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    samanco_row = pd.DataFrame({
+        'port_name': ['PUERTO_SAMANCO'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    supe_row = pd.DataFrame({
+        'port_name': ['PUERTO_SUPE'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    multi_row = pd.DataFrame({
+        'port_name': ['TERMINAL_MULTIBOYAS'],
+        'daily_wages': [avg_wages],
+        'n_fishermen': [avg_fishermen],
+        'daily_losses': [avg_losses]
+    })
+
+    df_wages_join = pd.concat([df_wages_join, chimbote_row, coishco_row, eldorado_row, elnuro_row, santa_row, ilo_row, callao_row, chorrillos_row, huarmey_row, samanco_row, supe_row, multi_row], ignore_index=True)
+
+    # df_wages_join.to_csv(f'{path_out}/df_wages_join.csv')
+    wage_port_list = df_wages_join['port_name'].unique()
+    # --- Port group aggregation logic ---
+    run_path = config.RUN_PATH if hasattr(config, 'RUN_PATH') else 'UNKNOWN'
+    port_list = None
+    if run_path == 'run_g1':
+        port_list = ['CALETA_CANCAS', 'CALETA_GRAU', 'CALETA_ACAPULCO', 'CALETA_CRUZ', 
+                    'PUERTO_PIZARRO', 'PUERTO_ZORRITOS']
+    elif run_path == 'run_g2':
+        port_list = ['BALNEARIO_DE_PUNTA_SAL', 'CALETA_MANCORA', 'CALETA_LOS_ORGANOS', 'CALETA_NURO',
+                     'CALETA_CABO_BLANCO']
+    elif run_path == 'run_g3':
+        port_list = ['CALETA_COLAN', 'PUERTO_BAYOVAR', 'CALETA_YACILLA', 'CALETA_ISLILLA', 
+                    'COLETA_TORTUGA', 'CALETA_CHULLILLACHE', 'CALETA_CONSTANTE', 'CALETA_MATACABALLO', 
+                    'CALETA_TIERRA_COLORADA', 'CALETA_DELICIAS', 'CALETA_PARACHIQUE', 'CALETA_PUERTO_RICO', 
+                    'PUERTO_PAITA', 'ENSENADA_SECHURA']
+    elif run_path == 'run_g4':
+        port_list = ['CALETA_DE_SAN_JOSE', 'PUERTO_ETEN', 'PUERTO_PIMENTEL', 'CALETA_DE_SANTA_ROSA']
+    elif run_path == 'run_g5':
+        port_list = ['PUERTO_CHIMBOTE', 'CALETA_COISHCO', 'CALETA_DORADO', 'CALETA_ÑURO', 
+                    'CALETA_SANTA', 'COLETA_CULEBRAS', 'CALETA_CHIMUS', 'PUERTO_HUARMEY', 
+                    'PUERTO_SAMANCO', 'PUERTO_CASMA', 'CALETA_VIDAL', 'CALETA_GRAMITA',
+                    'COLETA_TORTUGAS']
+    elif run_path == 'run_g6':
+        port_list = ['ANCON', 'DPA_CALLAO', 'DPA_CHORRILLOS', 'PUCUSANA']
+    elif run_path == 'run_g7':
+        port_list = ['CALETA_NAZCA', 'PUERTO_SAN_NICOLAS', 'PUERTO_SAN_JUAN', 'CALETA_LOMAS', 
+                    'CALETA_TANAKA', 'CALETA_PUERTO_VIEJO', 'CALETA_CHALA']
+    elif run_path == 'run_g8':
+        port_list = ['CALETA_NAZCA', 'PUERTO_SAN_NICOLAS', 'PUERTO_SAN_JUAN', 'CALETA_LOMAS',
+                     'CALETA_TANAKA', 'CALETA_CHALA']
+    elif run_path == 'run_g9':
+        port_list = ['CALETA_ATICO', 'CALETA_PLANCHADA', 'CALETA_QUILCA', 'MUELLE_OCEAN_FISH',
+                     'CALETA_FARO']
+    elif run_path == 'run_g10':
+        port_list = ['DPA_ILO', 'MUELLE_FISCAL_ILO', 'TERMINAL_PESQUERO_PUNTA_PICATA', 'DPA_MORRO_SAMA', 
+                    'DPA_VILA_VILA']
+
+    if port_list is not None:
+        N_PARAM = df_wages_join[df_wages_join['port_name'].isin(port_list)]['n_fishermen'].sum()
+        # Use the same averaging formula as user: average daily_wages across group, then divide by 3.5
+        W_PARAM = (df_wages_join[df_wages_join['port_name'].isin(port_list)]['daily_wages'].sum()/len(port_list))/3.5
+        print(f"[AEP] Aggregated N_PARAM (fishermen): {N_PARAM}")
+        print(f"[AEP] Aggregated W_PARAM (wage): {W_PARAM}")
+    else:
+        # Fallback: single port matching as before
+        port_name = config.reference_port.upper().replace(' ', '_')
+        row = df_wages_join[df_wages_join['port_name'] == port_name]
+        if not row.empty:
+            N_PARAM = float(row.iloc[0]['n_fishermen'])
+            W_PARAM = float(row.iloc[0]['daily_wages'])
+        else:
+            N_PARAM = 1
+            W_PARAM = 1
+            print(f"[AEP] Warning: Port '{port_name}' not found in wage data, using defaults.")
+except Exception as e:
+    N_PARAM = 1
+    W_PARAM = 1
+    print(f"[AEP] Warning: Could not load wage data: {e}. Using defaults.")
+
+# --- JIT and simulation functions (ported from legacy) ---
+from datetime import timedelta
+from numba import jit
+import numpy as np
+
+@jit(nopython=True, cache=True)
+def calculate_annual_loss_jit(predicted_events, N, W, min_days):
+    if len(predicted_events) == 0:
+        return 0
+    total_loss = 0
+    current_event_length = 0
+    for i in range(len(predicted_events)):
+        if predicted_events[i] == 1:
+            current_event_length += 1
+        else:
+            if current_event_length >= min_days:
+                total_loss += N * W * current_event_length
+            current_event_length = 0
+    if current_event_length >= min_days:
+        total_loss += N * W * current_event_length
+    return total_loss
+
+@jit(nopython=True, cache=True)
+def find_events_in_category_jit(predicted, observed, category_code):
+    durations = []
+    current_event_length = 0
+    for i in range(len(predicted)):
+        in_event = False
+        if category_code == 0:
+            in_event = (predicted[i] == 1) and (observed[i] == 0)
+        elif category_code == 1:
+            in_event = (predicted[i] == 0) and (observed[i] == 1)
+        elif category_code == 2:
+            in_event = (predicted[i] == 1) and (observed[i] == 1)
+        if in_event:
+            current_event_length += 1
+        else:
+            if current_event_length > 0:
+                durations.append(current_event_length)
+            current_event_length = 0
+    if current_event_length > 0:
+        durations.append(current_event_length)
+    return durations
+
+@jit(nopython=True, cache=True)
+def calculate_cm_costs_jit(predicted_events, observed_events, N, W, min_days):
+    fp_durations = find_events_in_category_jit(predicted_events, observed_events, 0)
+    fn_durations = find_events_in_category_jit(predicted_events, observed_events, 1)
+    tp_durations = find_events_in_category_jit(predicted_events, observed_events, 2)
+    fp_cost = 0
+    for duration in fp_durations:
+        if duration >= min_days:
+            fp_cost += N * W * duration
+    fn_cost = 0
+    for duration in fn_durations:
+        if duration >= min_days:
+            fn_cost += N * W * duration
+    tp_cost = 0
+    for duration in tp_durations:
+        if duration >= min_days:
+            tp_cost += N * W * duration
+    return fp_cost, fn_cost, tp_cost
+
+def vectorized_block_bootstrap(daily_clean, n_simulations, block_length=7, window_days=20, days_per_year=365):
+    from datetime import datetime
+    available_years = sorted(daily_clean.index.year.unique())
+    n_days = len(daily_clean)
+    print("  Pre-computing valid block positions...")
+    valid_starts_cache = {}
+    for day_of_year in range(1, days_per_year + 1, block_length):
+        ref_year = available_years[0]
+        try:
+            center_date = datetime(ref_year, 1, 1) + timedelta(days=day_of_year - 1)
+        except:
+            center_date = datetime(ref_year, 12, 31)
+        valid_starts = []
+        for year in available_years:
+            try:
+                year_center = datetime(year, center_date.month, center_date.day)
+            except ValueError:
+                if center_date.month == 2 and center_date.day == 29:
+                    year_center = datetime(year, 2, 28)
+                else:
+                    continue
+            window_start = year_center - timedelta(days=window_days//2)
+            window_end = year_center + timedelta(days=window_days//2)
+            year_mask = (daily_clean.index >= window_start) & (daily_clean.index <= window_end)
+            year_indices = np.where(year_mask)[0]
+            for start_idx in year_indices:
+                end_idx = start_idx + block_length - 1
+                if end_idx < n_days and daily_clean.index[end_idx] <= window_end:
+                    valid_starts.append(start_idx)
+        valid_starts_cache[day_of_year] = valid_starts
+    print("  Generating all simulation indices...")
+    all_simulation_indices = np.zeros((n_simulations, days_per_year), dtype=int)
+    for sim in range(n_simulations):
+        np.random.seed(sim)
+        current_day = 1
+        sim_indices = []
+        while current_day <= days_per_year:
+            days_remaining = days_per_year - current_day + 1
+            actual_block_size = min(block_length, days_remaining)
+            cache_day = ((current_day - 1) // block_length) * block_length + 1
+            valid_starts = valid_starts_cache.get(cache_day, list(range(n_days)))
+            if valid_starts:
+                chosen_start = np.random.choice(valid_starts)
+                block_indices = list(range(chosen_start, min(chosen_start + actual_block_size, n_days)))
+                sim_indices.extend(block_indices)
+            else:
+                fallback_indices = [current_day % n_days for _ in range(actual_block_size)]
+                sim_indices.extend(fallback_indices)
+            current_day += actual_block_size
+        all_simulation_indices[sim, :len(sim_indices[:days_per_year])] = sim_indices[:days_per_year]
+    return all_simulation_indices
+
+def process_simulation_batch_threaded(batch_indices, trigger_values_matrix, observed_matrix, N, W, min_days, trigger_threshold, has_observed):
+    batch_losses = []
+    batch_fp_costs = []
+    batch_fn_costs = []
+    batch_tp_costs = []
+    batch_event_counts = []
+    for sim_indices in batch_indices:
+        try:
+            trigger_vals = trigger_values_matrix[sim_indices]
+            predicted_events = (trigger_vals > trigger_threshold).astype(np.int32)
+            total_loss = calculate_annual_loss_jit(predicted_events, N, W, min_days)
+            batch_losses.append(total_loss)
+            n_events = np.sum(predicted_events)
+            if has_observed:
+                observed_vals = observed_matrix[sim_indices]
+                fp_cost, fn_cost, tp_cost = calculate_cm_costs_jit(predicted_events, observed_vals, N, W, min_days)
+                batch_fp_costs.append(fp_cost)
+                batch_fn_costs.append(fn_cost)
+                batch_tp_costs.append(tp_cost)
+                fp_events = len(find_events_in_category_jit(predicted_events, observed_vals, 0))
+                fn_events = len(find_events_in_category_jit(predicted_events, observed_vals, 1))
+                tp_events = len(find_events_in_category_jit(predicted_events, observed_vals, 2))
+                batch_event_counts.append({'fp_events': fp_events, 'fn_events': fn_events, 'tp_events': tp_events, 'n_events': n_events, 'tn_events': 0})
+            else:
+                # No observed, so just store n_events
+                batch_event_counts.append({'fp_events': 0, 'fn_events': 0, 'tp_events': 0, 'tn_events': 0, 'n_events': n_events})
+        except Exception as e:
+            batch_losses.append(0)
+            if has_observed:
+                batch_fp_costs.append(0)
+                batch_fn_costs.append(0)
+                batch_tp_costs.append(0)
+                batch_event_counts.append({'fp_events': 0, 'fn_events': 0, 'tp_events': 0, 'tn_events': 0, 'n_events': 0})
+            else:
+                batch_event_counts.append({'fp_events': 0, 'fn_events': 0, 'tp_events': 0, 'tn_events': 0, 'n_events': 0})
+    return batch_losses, batch_fp_costs, batch_fn_costs, batch_tp_costs, batch_event_counts
+
+def calculate_aep_curve_efficient(annual_losses, trigger_feature, trigger_threshold, min_days, N, W):
+    losses_sorted = np.sort(annual_losses)[::-1]
+    exceedance_prob = np.arange(1, len(losses_sorted)+1) / (len(losses_sorted)+1)
+    return pd.DataFrame({'loss': losses_sorted, 'probability': exceedance_prob})
+
+def calculate_aep_curve_cm(costs, cost_type, trigger_feature, trigger_threshold, min_days, N, W):
+    costs_sorted = np.sort(costs)[::-1]
+    exceedance_prob = np.arange(1, len(costs_sorted)+1) / (len(costs_sorted)+1)
+    return pd.DataFrame({'cost_type': cost_type, 'loss': costs_sorted, 'probability': exceedance_prob})
+
+def calculate_unified_aep_analysis_fast(swh_data, trigger_feature, trigger_threshold, N, W, min_days=None, n_simulations=None, observed_events=None, block_length=None, window_days=None, n_jobs=-1):
+    print(f"🚀 SPEED-OPTIMIZED UNIFIED AEP ANALYSIS")
+    print("=" * 50)
+    print(f"  Data: {len(swh_data)} observations")
+    print(f"  Trigger: {trigger_feature} > {trigger_threshold}")
+    print(f"  Port: {N} fishermen × ${W}/day")
+    print(f"  Min event: {min_days} days")
+    print(f"  Block length: {block_length} days")
+    print(f"  Simulations: {n_simulations}")
+    if trigger_feature not in swh_data.columns:
+        print(f"ERROR: {trigger_feature} not found in input DataFrame!")
+        return None
+    daily_clean = swh_data.copy().sort_index()
+    daily_clean = daily_clean.dropna(subset=[trigger_feature])
+    if len(daily_clean) == 0:
+        print("ERROR: No valid rows with trigger feature after cleaning!")
+        return None
+    print(f"  Using {len(daily_clean)} days for simulation.")
+    has_observed = observed_events is not None
+    if has_observed:
+        observed_aligned = observed_events.reindex(daily_clean.index, fill_value=0)
+        print(f"  Observed events: {observed_aligned.sum()} out of {len(observed_aligned)} days")
+        observed_matrix = observed_aligned.values.astype(np.int32)
+    else:
+        print("  No observed events provided - confusion matrix analysis will be skipped.")
+        observed_matrix = None
+    print("  Pre-computing trigger values...")
+    trigger_values_matrix = daily_clean[trigger_feature].values.astype(np.float32)
+    print("  Generating block bootstrap samples...")
+    all_simulation_indices = vectorized_block_bootstrap(
+        daily_clean, n_simulations, block_length, window_days, days_per_year=365
+    )
+    if n_jobs == -1:
+        import multiprocessing as mp
+        n_jobs = mp.cpu_count()
+    n_jobs = min(n_jobs, n_simulations)
+    print(f"  Processing {n_simulations} simulations using {n_jobs} parallel workers...")
+    batch_size = max(1, n_simulations // n_jobs)
+    simulation_batches = []
+    for i in range(0, n_simulations, batch_size):
+        end_idx = min(i + batch_size, n_simulations)
+        batch_indices = all_simulation_indices[i:end_idx]
+        simulation_batches.append(batch_indices)
+    all_losses = []
+    all_fp_costs = []
+    all_fn_costs = []
+    all_tp_costs = []
+    all_event_counts = []
+    if n_jobs == 1:
+        print("  Using single-threaded processing...")
+        for batch_indices in tqdm(simulation_batches, desc="Processing batches"):
+            batch_losses, batch_fp, batch_fn, batch_tp, batch_events = process_simulation_batch_threaded(
+                batch_indices, trigger_values_matrix, observed_matrix, 
+                N, W, min_days, trigger_threshold, has_observed
+            )
+            all_losses.extend(batch_losses)
+            if has_observed:
+                all_fp_costs.extend(batch_fp)
+                all_fn_costs.extend(batch_fn)
+                all_tp_costs.extend(batch_tp)
+                all_event_counts.extend(batch_events)
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        print(f"  Using {n_jobs} threads for parallel processing...")
+        def process_batch_wrapper(batch_indices):
+            return process_simulation_batch_threaded(
+                batch_indices, trigger_values_matrix, observed_matrix, 
+                N, W, min_days, trigger_threshold, has_observed
+            )
+        with ThreadPoolExecutor(max_workers=n_jobs) as executor:
+            from tqdm.auto import tqdm
+            results = list(tqdm(
+                executor.map(process_batch_wrapper, simulation_batches),
+                total=len(simulation_batches),
+                desc="Processing batches"
+            ))
+        for batch_losses, batch_fp, batch_fn, batch_tp, batch_events in results:
+            all_losses.extend(batch_losses)
+            if has_observed:
+                all_fp_costs.extend(batch_fp)
+                all_fn_costs.extend(batch_fn)
+                all_tp_costs.extend(batch_tp)
+                all_event_counts.extend(batch_events)
+    annual_losses = np.array(all_losses)
+    print(f"  Completed {len(annual_losses)} simulations successfully.")
+    print("  Calculating standard AEP curve...")
+    standard_aep_curve = calculate_aep_curve_efficient(
+        annual_losses, trigger_feature, trigger_threshold, min_days, N, W
+    )
+    standard_summary = {
+        'mean_loss': float(np.mean(annual_losses)),
+        'std_loss': float(np.std(annual_losses)),
+        'max_loss': float(np.max(annual_losses)),
+        'zero_prob': float(np.mean(annual_losses == 0)),
+        'method': 'speed_optimized_block_bootstrap',
+        'block_length': block_length,
+        'window_days': window_days,
+        'trigger_feature': trigger_feature,
+        'trigger_threshold': trigger_threshold,
+        'min_days': min_days,
+        'n_fishermen': N,
+        'daily_wage': W,
+        'n_simulations': len(annual_losses),
+        'n_jobs': n_jobs
+    }
+    print(f"\n📊 Standard AEP Results:")
+    print(f"  Mean annual loss: ${standard_summary['mean_loss']:,.0f}")
+    print(f"  Max annual loss: ${standard_summary['max_loss']:,.0f}")
+    print(f"  Zero loss probability: {standard_summary['zero_prob']:.1%}")
+    confusion_matrix_results = None
+    if has_observed and all_fp_costs:
+        print("  Calculating confusion matrix AEP curves...")
+        fp_annual_costs = np.array(all_fp_costs)
+        fn_annual_costs = np.array(all_fn_costs)
+        tp_annual_costs = np.array(all_tp_costs)
+        fp_aep = calculate_aep_curve_cm(fp_annual_costs, 'FP_Cost', trigger_feature, trigger_threshold, min_days, N, W)
+        fn_aep = calculate_aep_curve_cm(fn_annual_costs, 'FN_Cost', trigger_feature, trigger_threshold, min_days, N, W)
+        tp_aep = calculate_aep_curve_cm(tp_annual_costs, 'TP_Cost', trigger_feature, trigger_threshold, min_days, N, W)
+        insurance_annual_costs = fp_annual_costs + tp_annual_costs
+        insurance_aep = calculate_aep_curve_cm(insurance_annual_costs, 'Insurance_Cost', trigger_feature, trigger_threshold, min_days, N, W)
+        cm_summary = {
+            'fp_costs': {
+                'mean': float(np.mean(fp_annual_costs)),
+                'std': float(np.std(fp_annual_costs)),
+                'max': float(np.max(fp_annual_costs)),
+                'zero_prob': float(np.mean(fp_annual_costs == 0))
+            },
+            'fn_costs': {
+                'mean': float(np.mean(fn_annual_costs)),
+                'std': float(np.std(fn_annual_costs)),
+                'max': float(np.max(fn_annual_costs)),
+                'zero_prob': float(np.mean(fn_annual_costs == 0))
+            },
+            'tp_costs': {
+                'mean': float(np.mean(tp_annual_costs)),
+                'std': float(np.std(tp_annual_costs)),
+                'max': float(np.max(tp_annual_costs)),
+                'zero_prob': float(np.mean(tp_annual_costs == 0))
+            },
+            'insurance_costs': {
+                'mean': float(np.mean(insurance_annual_costs)),
+                'std': float(np.std(insurance_annual_costs)),
+                'max': float(np.max(insurance_annual_costs)),
+                'zero_prob': float(np.mean(insurance_annual_costs == 0))
+            }
+        }
+        print(f"\n🔍 Confusion Matrix Results:")
+        print(f"  FP Cost: ${cm_summary['fp_costs']['mean']:,.0f}")
+        print(f"  FN Cost: ${cm_summary['fn_costs']['mean']:,.0f}")
+        print(f"  TP Cost: ${cm_summary['tp_costs']['mean']:,.0f}")
+        print(f"  Total Insurance Cost: ${cm_summary['insurance_costs']['mean']:,.0f}")
+        if all_event_counts:
+            fp_events_avg = np.mean([ec['fp_events'] for ec in all_event_counts])
+            fn_events_avg = np.mean([ec['fn_events'] for ec in all_event_counts])
+            tp_events_avg = np.mean([ec['tp_events'] for ec in all_event_counts])
+            print(f"\n📊 Average Event Counts per Simulation:")
+            print(f"  FP Events (False Alarms): {fp_events_avg:.1f}")
+            print(f"  FN Events (Missed): {fn_events_avg:.1f}")
+            print(f"  TP Events (Correct): {tp_events_avg:.1f}")
+            print(f"  Total Events: {fp_events_avg + fn_events_avg + tp_events_avg:.1f}")
+        # Compute observed stats if possible
+        observed_stats = None
+        if has_observed and observed_matrix is not None:
+            # Calculate observed TP, FP, TN, FN for the entire period
+            predicted = (trigger_values_matrix > trigger_threshold).astype(int)
+            observed = observed_matrix
+            tp = np.sum((predicted == 1) & (observed == 1))
+            fp = np.sum((predicted == 1) & (observed == 0))
+            tn = np.sum((predicted == 0) & (observed == 0))
+            fn = np.sum((predicted == 0) & (observed == 1))
+            observed_stats = {
+                'obs_tp': int(tp),
+                'obs_fp': int(fp),
+                'obs_tn': int(tn),
+                'obs_fn': int(fn)
+            }
+        confusion_matrix_results = {
+            'fp_aep': fp_aep,
+            'fn_aep': fn_aep,
+            'tp_aep': tp_aep,
+            'insurance_aep': insurance_aep,
+            'fp_annual_costs': fp_annual_costs,
+            'fn_annual_costs': fn_annual_costs,
+            'tp_annual_costs': tp_annual_costs,
+            'insurance_annual_costs': insurance_annual_costs,
+            'summary': cm_summary,
+            'all_event_counts': all_event_counts if all_event_counts else [],
+            'observed_stats': observed_stats
+        }
+    unified_results = {
+        'standard_summary': standard_summary,
+        'standard_aep_curve': standard_aep_curve,
+        'confusion_matrix_results': confusion_matrix_results
+    }
+
+    # Observed yearly losses (if observed_events is provided)
+    obs_yearly_losses = None
+    if has_observed:
+        observed_aligned = observed_events.reindex(daily_clean.index, fill_value=0)
+        observed_years = daily_clean.index.year
+        obs_yearly_losses = {}
+        for year in np.unique(observed_years):
+            mask = (observed_years == year)
+            obs_loss = calculate_annual_loss_jit(observed_aligned.values[mask], N, W, min_days)
+            obs_yearly_losses[int(year)] = float(obs_loss)
+    if obs_yearly_losses is not None:
+        unified_results['obs_yearly_losses'] = obs_yearly_losses
+
+    return unified_results
+
+# --- Helper: Find best single rule and all thresholds ---
+def load_best_single_rule_and_all_thresholds(cv_results_path, folds_dir):
+    import pandas as pd
+    import numpy as np
+    import os
+
+    cv_df = pd.read_csv(cv_results_path)
+    single_rules = cv_df[cv_df['rule_type'] == 'single'].copy()
+    if single_rules.empty:
+        raise ValueError("No single-feature rules found in CV results.")
+    # Sort by f1_mean, then precision_mean, then recall_mean
+    single_rules = single_rules.sort_values(['f1_mean', 'precision_mean', 'recall_mean'], ascending=False)
+    best_rule = single_rules.iloc[0]
+    rule_name = best_rule['rule_name']
+    feature = rule_name.replace(' > threshold', '').replace('Single: ', '').strip()
+
+    # Now get all fold thresholds for this rule from fold_thresholds file
+    fold_files = [f for f in os.listdir(folds_dir) if f.startswith('fold_thresholds_') and f.endswith('.csv')]
+    if not fold_files:
+        raise ValueError("No fold_thresholds_*.csv file found in results directory. Run rule_evaluation.py first.")
+    latest_fold = sorted(fold_files)[-1]
+    folds_df = pd.read_csv(os.path.join(folds_dir, latest_fold))
+    folds = folds_df[(folds_df['rule_type'] == 'single') & (folds_df['rule_name'] == rule_name)]
+    if folds.empty:
+        raise ValueError(f"No fold thresholds found for rule: {rule_name}")
+    # The threshold is in the column named after the feature
+    if feature in folds.columns:
+        thresholds = folds[feature].values.astype(float)
+        thresholds = thresholds[~np.isnan(thresholds)]
+    else:
+        raise ValueError(f"No threshold column for feature '{feature}' found in fold thresholds file. Columns are: {list(folds.columns)}")
+    return feature, thresholds
+
+# --- Helper: Plot rule condition (for validation) ---
+def plot_rule_condition(df, feature, threshold, event_col='event_dummy_1', save_path=None):
+    plt.figure(figsize=(12, 5))
+    plt.plot(df['date'], df[feature], label=feature)
+    plt.axhline(threshold, color='red', linestyle='--', label=f'Threshold: {threshold:.2f}')
+    plt.scatter(df['date'], df[event_col], color='orange', alpha=0.3, label='Events')
+    plt.legend()
+    plt.title(f'Best Rule: {feature} > {threshold:.2f}')
+    plt.xlabel('Date')
+    plt.ylabel(feature)
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path)
+    plt.show()
+
+# --- MAIN EXECUTION ---
+def main():
+    print("\n🔧 AEP_CALCULATION.PY - Final AEP Analysis (Multi-threshold Experiment)")
+    print(f"Run: {config.RUN_PATH}")
+    print(f"Reference port: {config.reference_port}")
+
+    # --- Load input data ---
+    merged_path = os.path.join(config.run_output_dir, 'df_swan_waverys_merged.csv')
+    if not os.path.exists(merged_path):
+        print(f"❌ Input file not found: {merged_path}")
+        return
+    df = pd.read_csv(merged_path, parse_dates=['date'])
+
+    # --- Set timestamp and results_dir for output files ---
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    results_dir = config.results_output_dir
+
+    # --- Locate latest CV results file ---
+    cv_files = [f for f in os.listdir(results_dir) if (f == 'rule_cv_results.csv' or (f.startswith('cv_results_') and f.endswith('.csv')))]
+    if not cv_files:
+        print(f"❌ No CV results found in {results_dir}")
+        return
+    latest_cv = sorted(cv_files)[-1]
+    cv_results_path = os.path.join(results_dir, latest_cv)
+
+    # --- Select best rule and gather all candidate thresholds ---
+    feature, fold_thresholds = load_best_single_rule_and_all_thresholds(cv_results_path, results_dir)
+    print(f"✅ Best single rule: {feature}")
+    print(f"Fold thresholds: {fold_thresholds}")
+
+    # Compute candidate thresholds
+    candidate_thresholds = []
+    candidate_labels = []
+    # Individual fold thresholds
+    for i, t in enumerate(fold_thresholds):
+        candidate_thresholds.append(t)
+        candidate_labels.append(f'fold{i}')
+    # Mean, median, 75th percentile
+    mean_thr = np.mean(fold_thresholds)
+    median_thr = np.median(fold_thresholds)
+    p75_thr = np.percentile(fold_thresholds, 75)
+    candidate_thresholds.extend([mean_thr, median_thr, p75_thr])
+    candidate_labels.extend(['mean', 'median', 'p75'])
+
+    # --- Optional: Plot rule condition for validation ---
+    if ENABLE_PLOTTING:
+        plot_path = os.path.join(results_dir, f'best_rule_plot_{config.RUN_PATH}.png')
+        plot_rule_condition(df, feature, mean_thr, save_path=plot_path)
+
+    # --- Run AEP simulation for each candidate threshold ---
+    print("\n🚀 Running speed-optimized AEP simulation for multiple thresholds...")
+    observed_col = 'event_dummy_1' if 'event_dummy_1' in df.columns else None
+    observed_events = df.set_index('date')[observed_col] if observed_col else None
+    swh_data = df.set_index('date')
+
+    summary_rows = []
+    for thr, label in zip(candidate_thresholds, candidate_labels):
+        print(f"\n--- Threshold ({label}): {thr:.5f} ---")
+        aep_results = calculate_unified_aep_analysis_fast(
+            swh_data,
+            trigger_feature=feature,
+            trigger_threshold=thr,
+            N=N_PARAM,
+            W=W_PARAM,
+            min_days=config.MIN_DAYS,
+            n_simulations=config.N_SIMULATIONS,
+            observed_events=observed_events,
+            block_length=config.BLOCK_LENGTH,
+            window_days=config.WINDOW_DAYS,
+            n_jobs=-1
+        )
+        if aep_results is None:
+            print(f"❌ AEP simulation failed for threshold {thr:.5f} ({label})")
+            continue
+        # Print summary
+        mean_loss = aep_results['standard_summary']['mean_loss']
+        print(f"Rule-based method ({label}): mean annual loss = ${mean_loss:,.0f}")
+        # Save results
+        summary_path = os.path.join(results_dir, f'aep_summary_{label}_{timestamp}.csv')
+        aep_curve_path = os.path.join(results_dir, f'aep_curve_{label}_{timestamp}.csv')
+        pd.DataFrame([aep_results['standard_summary']]).to_csv(summary_path, index=False)
+        pd.DataFrame(aep_results['standard_aep_curve']).to_csv(aep_curve_path, index=False)
+        # --- Save observed yearly losses as CSV if available ---
+        if 'obs_yearly_losses' in aep_results and aep_results['obs_yearly_losses']:
+            obs_losses = aep_results['obs_yearly_losses']
+            obs_losses_path = os.path.join(results_dir, f'observed_yearly_losses_{label}_{timestamp}.csv')
+            if isinstance(obs_losses, dict):
+                obs_df = pd.DataFrame({
+                    'year': list(obs_losses.keys()),
+                    'observed_loss': list(obs_losses.values())
+                })
+            elif isinstance(obs_losses, (list, tuple, pd.Series)):
+                obs_df = pd.DataFrame({'observed_loss': list(obs_losses)})
+            else:
+                obs_df = None
+            if obs_df is not None:
+                obs_df.to_csv(obs_losses_path, index=False)
+        if 'obs_yearly_losses' in aep_results:
+            row = dict(threshold_label=label, threshold_value=thr)
+            row.update(aep_results['standard_summary'])
+            # Add confusion matrix results for later summary table
+            row['confusion_matrix_results'] = aep_results.get('confusion_matrix_results', None)
+            # Add observed yearly losses if present
+            if 'obs_yearly_losses' in aep_results:
+                row['obs_yearly_losses'] = aep_results['obs_yearly_losses']
+            summary_rows.append(row)
+
+    # --- Combined summary CSV for all thresholds ---
+    if summary_rows:
+        all_summary_path = os.path.join(results_dir, f'aep_multi_threshold_summary_{timestamp}.csv')
+        pd.DataFrame(summary_rows).to_csv(all_summary_path, index=False)
+        print(f"\n✅ Saved all-threshold summary: {all_summary_path}")
+
+        # --- Print and save final full summary table for each threshold ---
+        print("\n===== FINAL SUMMARY TABLE (full stats) =====")
+        summary_table = []
+        observed_stats = None
+        observed_losses = None
+        for thr, label in zip(candidate_thresholds, candidate_labels):
+            aep_curve_path = os.path.join(results_dir, f'aep_curve_{label}_{timestamp}.csv')
+            summary_path = os.path.join(results_dir, f'aep_summary_{label}_{timestamp}.csv')
+            try:
+                aep_curve = pd.read_csv(aep_curve_path)
+                losses = aep_curve['loss'].values
+                mean_loss = np.mean(losses)
+                median_loss = np.median(losses)
+                p99_loss = np.percentile(losses, 99)
+            except Exception as e:
+                print(f"[Warning] Could not load curve for {label}: {e}")
+                mean_loss = median_loss = p99_loss = np.nan
+
+            # Load confusion matrix and event stats from summary file
+            try:
+                summary_df = pd.read_csv(summary_path)
+                n_sim = int(summary_df['n_simulations'].iloc[0]) if 'n_simulations' in summary_df else None
+            except Exception as e:
+                n_sim = None
+
+            # Try to load event stats from confusion matrix results (if present)
+            cm_stats = {'mean_events': np.nan, 'median_events': np.nan, 'p99_events': np.nan,
+                        'mean_tp': np.nan, 'median_tp': np.nan, 'p99_tp': np.nan,
+                        'mean_fp': np.nan, 'median_fp': np.nan, 'p99_fp': np.nan,
+                        'mean_tn': np.nan, 'median_tn': np.nan, 'p99_tn': np.nan,
+                        'mean_fn': np.nan, 'median_fn': np.nan, 'p99_fn': np.nan}
+            obs_stats = {'obs_tp': np.nan, 'obs_fp': np.nan, 'obs_tn': np.nan, 'obs_fn': np.nan}
+            obs_losses_row = {'obs_losses': np.nan}
+            # Try to get these from the confusion matrix results if available
+            try:
+                # Try to load the confusion matrix results from the in-memory run
+                # (This block assumes the run was not interrupted and aep_results is available)
+                # Otherwise, skip
+                pass  # We'll fill these in during the main loop below
+            except Exception:
+                pass
+
+            # Instead, let's use the in-memory aep_results from the run (already in summary_rows)
+            # Find the correct row in summary_rows
+            this_row = next((r for r in summary_rows if r['threshold_label'] == label), None)
+            if this_row and 'confusion_matrix_results' in this_row and this_row['confusion_matrix_results'] is not None:
+                cmr = this_row['confusion_matrix_results']
+                # Simulated event stats
+                all_event_counts = cmr.get('all_event_counts', [])
+                if all_event_counts and any([d.get('n_events', 0) > 0 for d in all_event_counts]):
+                    tp_list = [d.get('tp_events', 0) for d in all_event_counts]
+                    fp_list = [d.get('fp_events', 0) for d in all_event_counts]
+                    tn_list = [d.get('tn_events', 0) for d in all_event_counts]
+                    fn_list = [d.get('fn_events', 0) for d in all_event_counts]
+                    n_events_list = [d.get('n_events', 0) for d in all_event_counts]
+                else:
+                    tp_list = fp_list = tn_list = fn_list = n_events_list = [0]
+                cm_stats = {
+                    'mean_events': np.mean(n_events_list),
+                    'median_events': np.median(n_events_list),
+                    'p99_events': np.percentile(n_events_list, 99),
+                    'mean_tp': np.mean(tp_list),
+                    'median_tp': np.median(tp_list),
+                    'p99_tp': np.percentile(tp_list, 99),
+                    'mean_fp': np.mean(fp_list),
+                    'median_fp': np.median(fp_list),
+                    'p99_fp': np.percentile(fp_list, 99),
+                    'mean_tn': np.mean(tn_list),
+                    'median_tn': np.median(tn_list),
+                    'p99_tn': np.percentile(tn_list, 99),
+                    'mean_fn': np.mean(fn_list),
+                    'median_fn': np.median(fn_list),
+                    'p99_fn': np.percentile(fn_list, 99),
+                }
+                # Losses for TP, FP, FN
+                tp_annual_costs = cmr.get('tp_annual_costs', np.array([0]))
+                fp_annual_costs = cmr.get('fp_annual_costs', np.array([0]))
+                fn_annual_costs = cmr.get('fn_annual_costs', np.array([0]))
+                loss_stats = {
+                    'mean_tp_loss': np.mean(tp_annual_costs),
+                    'median_tp_loss': np.median(tp_annual_costs),
+                    'p99_tp_loss': np.percentile(tp_annual_costs, 99),
+                    'mean_fp_loss': np.mean(fp_annual_costs),
+                    'median_fp_loss': np.median(fp_annual_costs),
+                    'p99_fp_loss': np.percentile(fp_annual_costs, 99),
+                    'mean_fn_loss': np.mean(fn_annual_costs),
+                    'median_fn_loss': np.median(fn_annual_costs),
+                    'p99_fn_loss': np.percentile(fn_annual_costs, 99),
+                }
+                # Observed stats (repeat for all thresholds)
+                obs_stats = cmr.get('observed_stats', obs_stats)
+            # Observed yearly loss and events
+            mean_obs_yearly_loss = np.nan
+            mean_obs_yearly_events = np.nan
+            obs_yearly_losses = this_row.get('obs_yearly_losses', None)
+            if obs_yearly_losses and isinstance(obs_yearly_losses, dict):
+                loss_vals = list(obs_yearly_losses.values())
+                if len(loss_vals) > 0:
+                    mean_obs_yearly_loss = np.mean(loss_vals)
+            # For observed yearly events, need to get observed_events from original data
+            # We'll approximate using obs_tp + obs_fn per year if available
+            # But here, just use obs_tp + obs_fn (total) divided by number of years
+            if 'obs_tp' in obs_stats and 'obs_fn' in obs_stats:
+                n_years = len(obs_yearly_losses) if obs_yearly_losses else 1
+                mean_obs_yearly_events = (obs_stats['obs_tp'] + obs_stats['obs_fn']) / n_years if n_years > 0 else (obs_stats['obs_tp'] + obs_stats['obs_fn'])
+            # Compose final row
+            row = {
+                'variable': feature,
+                'run_path': config.RUN_PATH,
+                'threshold_label': label,
+                'threshold_value': float(thr),
+                'mean_loss': mean_loss,
+                'median_loss': median_loss,
+                'p99_loss': p99_loss,
+                **cm_stats,
+                **loss_stats,
+                **obs_stats,
+                'mean_obs_yearly_loss': mean_obs_yearly_loss,
+                'mean_obs_yearly_events': mean_obs_yearly_events
+            }
+            summary_table.append(row)
+        # Add mean_loss_minus_obs and sort by abs(mean_loss_minus_obs)
+        for row in summary_table:
+            row['mean_loss_minus_obs'] = row['mean_loss'] - row['mean_obs_yearly_loss'] if not pd.isna(row['mean_obs_yearly_loss']) else np.nan
+        # Sort by abs(mean_loss_minus_obs)
+        summary_table_sorted = sorted(summary_table, key=lambda r: abs(r['mean_loss_minus_obs']) if not pd.isna(r['mean_loss_minus_obs']) else float('inf'))
+        # Print as table
+        import tabulate
+        float_cols = [k for k in summary_table_sorted[0].keys() if k != 'threshold_label']
+        print(tabulate.tabulate(summary_table_sorted, headers="keys", floatfmt=(".3f",)+tuple([".2f"]*(len(float_cols)))))
+        # Save to CSV
+        full_summary_path = os.path.join(results_dir, f'aep_multi_threshold_full_summary_{timestamp}.csv')
+        pd.DataFrame(summary_table_sorted).to_csv(full_summary_path, index=False)
+        print(f"\n✅ Saved full summary table: {full_summary_path}")
+
+        # --- Plot AEP curve for the best threshold (smallest abs(mean_loss_minus_obs)) ---
+        best_row = summary_table_sorted[0]
+        best_label = best_row['threshold_label']
+        best_curve_path = os.path.join(results_dir, f'aep_curve_{best_label}_{timestamp}.csv')
+        best_obs_losses = None
+        if os.path.exists(best_curve_path):
+            aep_curve = pd.read_csv(best_curve_path)
+            plt.figure(figsize=(12, 7))
+            plt.plot(aep_curve['loss'], aep_curve['probability'], color='blue', lw=2.5, marker='o', markersize=3)
+            plt.xlabel('Loss ($)', fontsize=14)
+            plt.ylabel('Exceedance Probability', fontsize=14)
+            plt.title(f'Best AEP Curve: {best_label}', fontsize=16)
+            # Overlay observed yearly losses from CSV if available (pipeline style)
+            import seaborn as sns
+            handles = []
+            labels = []
+            obs_losses_csv = os.path.join(results_dir, f'observed_yearly_losses_{best_label}_{timestamp}.csv')
+            if os.path.exists(obs_losses_csv):
+                obs_df = pd.read_csv(obs_losses_csv)
+                print('DEBUG: observed losses loaded:')
+                print(obs_df)
+                for idx, row in obs_df.iterrows():
+                    plt.axvline(row['observed_loss'], color='gray', linestyle='--', linewidth=2, alpha=0.8)
+                    if 'year' in row:
+                        # Remove .0 from label, shift slightly right
+                        year_label = str(int(row['year']))
+                        x_shift = 10  # pixels
+                        plt.text(row['observed_loss'] + x_shift, 0.98, year_label, rotation=90, color='gray', fontsize=12, ha='center', va='top', fontweight='bold')
+            else:
+                print(f"DEBUG: Observed losses CSV not found: {obs_losses_csv}")
+            # Add vertical line for AEP mean loss in dark green
+            if 'mean_loss' in best_row and not np.isnan(best_row['mean_loss']):
+                h_aep = plt.axvline(best_row['mean_loss'], color='forestgreen', linestyle=':', linewidth=2.5, label='AEP Mean')
+                plt.text(best_row['mean_loss'], 0.85, f'AEP Mean\n${best_row["mean_loss"]/1000:.0f}K', color='forestgreen', fontsize=12, fontweight='bold', ha='center', va='top')
+                plt.legend([h_aep], ['AEP Mean'], loc='upper right', fontsize=12)
+            # Format x-axis as $X,XXXK
+            import matplotlib.ticker as mticker
+            def k_fmt(x, pos):
+                return f'${int(x/1000):,}K'
+            plt.gca().xaxis.set_major_formatter(mticker.FuncFormatter(k_fmt))
+            # Use variable and threshold in title
+            plot_variable = best_row.get('variable', best_label)
+            plot_thr = best_row.get('threshold_value', None)
+            if plot_thr is not None:
+                plt.title(f'{plot_variable} | Threshold: {plot_thr:.5f}', fontsize=16)
+            else:
+                plt.title(str(plot_variable), fontsize=16)
+            plt.tight_layout()
+            out_path = os.path.join(results_dir, f'aep_curve_best_threshold_{timestamp}.png')
+            plt.savefig(out_path)
+            print(f"✅ Saved best AEP curve plot: {out_path}")
+            plt.close()
+
+    print("\n🎉 Multi-threshold AEP calculation completed!")
+
+if __name__ == "__main__":
+    main()

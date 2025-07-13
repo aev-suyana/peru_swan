@@ -1,0 +1,2 @@
+mean_loss,std_loss,max_loss,zero_prob,method,block_length,window_days,trigger_feature,trigger_threshold,min_days,n_fishermen,daily_wage,n_simulations,n_jobs,is_derived_feature
+0.0,0.0,0.0,1.0,enhanced_full_pipeline_bootstrap,7,20,anom_swh_p25_persistence_2,0.2594789251233593,1,14424.0,11.269387755102041,100,12,True

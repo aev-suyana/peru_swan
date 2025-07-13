@@ -16,7 +16,7 @@ import numpy as np
 from datetime import datetime
 import importlib.util
 
-# Allow overriding RUN_PATH from environment variable
+# # Allow overriding RUN_PATH from environment variable
 RUN_PATH = os.environ.get('RUN_PATH', 'run_g10')  # fallback to default if not set
 MIN_DAYS = int(os.environ.get('MIN_DAYS', 1))  # ensure integer type
 
@@ -78,9 +78,9 @@ class Config:
 
     # Simplified CSV file mapping
     CSV_FILE_MAPPING = {
-    'run_g1': 'g1_wave_height.csv',
+    'run_g1': 'g1_wave_height (1).csv',
     'run_g2': 'g2_wave_height.csv',
-    'run_g3': 'g3_wave_height.csv',
+    'run_g3': 'g3_wave_height (1).csv',
     'run_g4': 'g4_wave_height.csv',
     'run_g5': 'g5_wave_height.csv',
     'run_g6': 'g6_wave_height.csv',

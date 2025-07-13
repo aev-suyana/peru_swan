@@ -1,0 +1,3 @@
+type,description,f1_score,mean_loss,zero_prob
+triple_AND,anom_swh_min_swan AND swh_max_swan AND anom_swh_median_persistence_2,0.39705882352941174,1859567.9843265307,0.0
+triple_AND_OR,anom_swh_min_swan AND swh_max_swan OR anom_swh_median_deseasonalized,0.31958762886597936,3181909.378775511,0.0

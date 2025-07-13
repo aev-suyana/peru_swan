@@ -125,3 +125,337 @@ best_df.to_excel(out_path, index=False)
 print(f"\n✅ Saved best-per-run summary: {out_path}")
 
 # %%
+# Add this code at the end of results_ppt.py
+
+print(f"\n{'='*80}")
+print("ADDING MULTI-CONDITION RESULTS TO SUMMARY")
+print("="*80)
+
+def extract_multi_condition_best_results(run_dirs):
+    """Extract best multi-condition results from each run directory"""
+    multi_condition_rows = []
+    
+    for run_dir in run_dirs:
+        run_name = os.path.basename(run_dir)
+        print(f"\n🔍 Checking {run_name} for multi-condition results...")
+        
+        # Look for multi-condition result files
+        multi_files = []
+        multi_files.extend(sorted(glob.glob(os.path.join(run_dir, 'enhanced_multi_rule_summary_*.csv'))))
+        multi_files.extend(sorted(glob.glob(os.path.join(run_dir, 'fast_multi_rule_summary_*.csv'))))
+        multi_files.extend(sorted(glob.glob(os.path.join(run_dir, 'baseline_comparison_*.csv'))))
+        
+        if not multi_files:
+            print(f"   ⚠️ No multi-condition files found")
+            continue
+        
+        # Try to extract the best multi-condition result
+        best_multi_result = None
+        
+        # Method 1: Try enhanced/fast multi-rule summary files
+        for file_path in multi_files:
+            if 'multi_rule_summary' in file_path:
+                try:
+                    df_multi = pd.read_csv(file_path)
+                    if len(df_multi) > 0:
+                        best_rule = df_multi.iloc[0]  # Best performing rule
+                        
+                        # Calculate confusion matrix for this rule
+                        multi_cm = calculate_multi_rule_cm_for_run(run_dir, best_rule)
+                        
+                        if multi_cm:
+                            best_multi_result = {
+                                'run_dir': run_name,
+                                'method': 'Multi-Condition',
+                                'rule_type': best_rule.get('type', 'Unknown'),
+                                'rule_description': best_rule.get('description', 'Unknown'),
+                                'f1_score': float(best_rule.get('f1_score', 0)),
+                                'mean_loss': float(best_rule.get('mean_loss', 0)),
+                                'zero_prob': float(best_rule.get('zero_prob', 0)),
+                                **multi_cm,
+                                'source_file': os.path.basename(file_path)
+                            }
+                            print(f"   ✅ Found multi-condition result: {best_rule.get('type', 'Unknown')}")
+                            break
+                except Exception as e:
+                    print(f"   ⚠️ Error reading {file_path}: {e}")
+                    continue
+        
+        # Method 2: Try baseline comparison files  
+        if not best_multi_result:
+            comparison_files = [f for f in multi_files if 'baseline_comparison' in f]
+            for file_path in comparison_files:
+                try:
+                    df_comp = pd.read_csv(file_path)
+                    multi_rows = df_comp[df_comp['analysis_type'].str.contains('multi_rule', na=False)]
+                    if len(multi_rows) > 0:
+                        best_comp = multi_rows.iloc[0]
+                        best_multi_result = {
+                            'run_dir': run_name,
+                            'method': 'Multi-Condition',
+                            'rule_type': 'From Comparison',
+                            'rule_description': best_comp.get('description', 'Unknown'),
+                            'f1_score': float(best_comp.get('f1_score', 0)),
+                            'mean_loss': float(best_comp.get('mean_loss', 0)),
+                            'zero_prob': 0,  # Not available in comparison
+                            'obs_tp': 0, 'obs_fp': 0, 'obs_tn': 0, 'obs_fn': 0,  # Would need calculation
+                            'obs_precision': 0, 'obs_recall': 0, 'obs_accuracy': 0, 'obs_f1': 0,
+                            'source_file': os.path.basename(file_path)
+                        }
+                        print(f"   ✅ Found comparison result: {best_comp.get('description', 'Unknown')}")
+                        break
+                except Exception as e:
+                    continue
+        
+        if best_multi_result:
+            multi_condition_rows.append(best_multi_result)
+        else:
+            print(f"   ❌ No usable multi-condition results found")
+    
+    return multi_condition_rows
+
+def calculate_multi_rule_cm_for_run(run_dir, rule_info):
+    """Calculate confusion matrix for a multi-rule in a specific run"""
+    try:
+        # Try to find the merged data file for this run
+        run_name = os.path.basename(run_dir)
+        
+        # Infer the data path based on run name
+        base_data_dir = os.path.join(os.path.dirname(BASE_RESULTS_DIR), '..', 'wave_analysis_pipeline', 'data', 'processed')
+        data_path = os.path.join(base_data_dir, run_name, 'df_swan_waverys_merged.csv')
+        
+        if not os.path.exists(data_path):
+            print(f"     ⚠️ Data file not found: {data_path}")
+            return None
+        
+        df_data = pd.read_csv(data_path, parse_dates=['date'])
+        
+        # Get rule details
+        features = rule_info.get('features', [])
+        thresholds = rule_info.get('thresholds', [])
+        rule_type = rule_info.get('type', '')
+        
+        # Handle string representations
+        if isinstance(features, str):
+            import ast
+            try:
+                features = ast.literal_eval(features)
+            except:
+                # Try simple parsing
+                features = features.strip('[]').replace("'", "").split(', ')
+        
+        if isinstance(thresholds, str):
+            try:
+                thresholds = ast.literal_eval(thresholds)
+            except:
+                def clean_float_string(x):
+                    x = x.strip()
+                    x = x.replace('np.float64(', '').replace(')', '')
+                    x = x.lstrip('(').rstrip(')')
+                    return float(x)
+                thresholds = [clean_float_string(x) for x in thresholds.strip('[]').split(',') if x.strip()]
+        
+        if len(features) < 2 or len(thresholds) < 2:
+            return None
+        
+        # Check if features exist
+        missing_features = [f for f in features if f not in df_data.columns]
+        if missing_features:
+            return None
+        
+        # Apply rule logic
+        if 'AND' in rule_type:
+            rule_prediction = df_data[features[0]] > thresholds[0]
+            for i in range(1, len(features)):
+                rule_prediction = rule_prediction & (df_data[features[i]] > thresholds[i])
+        elif 'OR' in rule_type:
+            rule_prediction = df_data[features[0]] > thresholds[0]
+            for i in range(1, len(features)):
+                rule_prediction = rule_prediction | (df_data[features[i]] > thresholds[i])
+        else:
+            return None
+        
+        predictions = rule_prediction.astype(int)
+        observed = df_data['event_dummy_1'].astype(int)
+        
+        # Calculate confusion matrix
+        tp = int(np.sum((predictions == 1) & (observed == 1)))
+        fp = int(np.sum((predictions == 1) & (observed == 0)))
+        tn = int(np.sum((predictions == 0) & (observed == 0)))
+        fn = int(np.sum((predictions == 0) & (observed == 1)))
+        
+        total = tp + fp + tn + fn
+        
+        return {
+            'obs_tp': tp,
+            'obs_fp': fp, 
+            'obs_tn': tn,
+            'obs_fn': fn,
+            'obs_precision': tp / (tp + fp) if (tp + fp) > 0 else 0,
+            'obs_recall': tp / (tp + fn) if (tp + fn) > 0 else 0,
+            'obs_accuracy': (tp + tn) / total if total > 0 else 0,
+            'obs_f1': 2 * tp / (2 * tp + fp + fn) if (2 * tp + fp + fn) > 0 else 0
+        }
+        
+    except Exception as e:
+        print(f"     ❌ Error calculating CM: {e}")
+        return None
+
+# Extract multi-condition results
+multi_condition_results = extract_multi_condition_best_results(run_dirs)
+
+if multi_condition_results:
+    print(f"\n✅ Found multi-condition results for {len(multi_condition_results)} runs")
+    
+    # Create multi-condition summary DataFrame
+    multi_df = pd.DataFrame(multi_condition_results)
+    
+    # Add totals row for multi-condition results
+    numeric_cols_multi = multi_df.select_dtypes(include=[np.number]).columns
+    summary_row_multi = multi_df[numeric_cols_multi].sum().to_dict()
+    summary_row_multi.update({col: 'TOTAL' for col in multi_df.columns if col not in numeric_cols_multi})
+    multi_df = pd.concat([multi_df, pd.DataFrame([summary_row_multi])], ignore_index=True)
+    
+    # Save multi-condition results
+    multi_out_path = os.path.join(BASE_RESULTS_DIR, 'multi_condition_best_per_run_summary.xlsx')
+    multi_df.to_excel(multi_out_path, index=False)
+    print(f"✅ Saved multi-condition summary: {multi_out_path}")
+    
+    # Create combined comparison table
+    print(f"\n📊 CREATING COMBINED COMPARISON TABLE")
+    print("="*60)
+    
+    # Prepare best single-rule results for comparison
+    single_rule_comparison = []
+    for _, row in best_df.iterrows():
+        if row['run_dir'] != 'TOTAL':
+            single_rule_comparison.append({
+                'run_dir': row['run_dir'],
+                'method': 'Single Rule',
+                'rule_type': 'Best Single',
+                'rule_description': f"{row.get('variable', 'Unknown')} > {row.get('threshold_value', 'Unknown')}",
+                'mean_loss': row['mean_loss'],
+                'obs_tp': row['obs_tp'],
+                'obs_fp': row['obs_fp'], 
+                'obs_tn': row['obs_tn'],
+                'obs_fn': row['obs_fn'],
+                'obs_precision': row['obs_precision'],
+                'obs_recall': row['obs_recall'],
+                'obs_accuracy': row['obs_accuracy'],
+                'obs_f1': row['obs_f1']
+            })
+    
+    # Prepare multi-condition results for comparison
+    multi_rule_comparison = []
+    for _, row in multi_df.iterrows():
+        if row['run_dir'] != 'TOTAL':
+            multi_rule_comparison.append({
+                'run_dir': row['run_dir'],
+                'method': 'Multi-Condition',
+                'rule_type': row.get('rule_type', 'Unknown'),
+                'rule_description': row.get('rule_description', 'Unknown'),
+                'mean_loss': row.get('mean_loss', 0),
+                'obs_tp': row.get('obs_tp', 0),
+                'obs_fp': row.get('obs_fp', 0),
+                'obs_tn': row.get('obs_tn', 0), 
+                'obs_fn': row.get('obs_fn', 0),
+                'obs_precision': row.get('obs_precision', 0),
+                'obs_recall': row.get('obs_recall', 0),
+                'obs_accuracy': row.get('obs_accuracy', 0),
+                'obs_f1': row.get('obs_f1', 0)
+            })
+    
+    # Combine all results
+    all_comparison = single_rule_comparison + multi_rule_comparison
+    comparison_df = pd.DataFrame(all_comparison)
+    
+    # Add improvement calculation
+    improvement_data = []
+    run_groups = comparison_df.groupby('run_dir')
+    
+    for run_name, group in run_groups:
+        single_row = group[group['method'] == 'Single Rule']
+        multi_row = group[group['method'] == 'Multi-Condition']
+        
+        if len(single_row) > 0 and len(multi_row) > 0:
+            single_loss = single_row.iloc[0]['mean_loss']
+            multi_loss = multi_row.iloc[0]['mean_loss']
+            single_f1 = single_row.iloc[0]['obs_f1']
+            multi_f1 = multi_row.iloc[0]['obs_f1']
+            
+            # Add to single rule row
+            single_data = single_row.iloc[0].copy()
+            single_data['loss_improvement_vs_multi'] = ((multi_loss - single_loss) / single_loss * 100) if single_loss > 0 else 0
+            single_data['f1_improvement_vs_multi'] = ((single_f1 - multi_f1) / multi_f1 * 100) if multi_f1 > 0 else 0
+            improvement_data.append(single_data)
+            
+            # Add to multi rule row  
+            multi_data = multi_row.iloc[0].copy()
+            multi_data['loss_improvement_vs_multi'] = ((single_loss - multi_loss) / single_loss * 100) if single_loss > 0 else 0
+            multi_data['f1_improvement_vs_multi'] = ((multi_f1 - single_f1) / single_f1 * 100) if single_f1 > 0 else 0
+            improvement_data.append(multi_data)
+    
+    if improvement_data:
+        improvement_df = pd.DataFrame(improvement_data)
+        
+        # Round numerical columns
+        numeric_cols = ['mean_loss', 'obs_precision', 'obs_recall', 'obs_accuracy', 'obs_f1', 
+                       'loss_improvement_vs_multi', 'f1_improvement_vs_multi']
+        for col in numeric_cols:
+            if col in improvement_df.columns:
+                improvement_df[col] = improvement_df[col].round(3)
+        
+        # Save combined comparison
+        combined_out_path = os.path.join(BASE_RESULTS_DIR, 'single_vs_multi_condition_comparison.xlsx')
+        improvement_df.to_excel(combined_out_path, index=False)
+        print(f"✅ Saved combined comparison: {combined_out_path}")
+        
+        # Print summary comparison
+        print(f"\n📋 SINGLE RULE vs MULTI-CONDITION COMPARISON")
+        print("="*80)
+        
+        # Show best performing method per run
+        best_per_run = improvement_df.loc[improvement_df.groupby('run_dir')['obs_f1'].idxmax()]
+        
+        method_wins = best_per_run['method'].value_counts()
+        print(f"\n🏆 METHOD WINS BY F1 SCORE:")
+        for method, wins in method_wins.items():
+            print(f"   {method}: {wins} runs")
+        
+        # Show average improvements
+        single_rows = improvement_df[improvement_df['method'] == 'Single Rule']
+        multi_rows = improvement_df[improvement_df['method'] == 'Multi-Condition']
+        
+        if len(single_rows) > 0 and len(multi_rows) > 0:
+            avg_single_f1 = single_rows['obs_f1'].mean()
+            avg_multi_f1 = multi_rows['obs_f1'].mean()
+            avg_single_loss = single_rows['mean_loss'].mean()
+            avg_multi_loss = multi_rows['mean_loss'].mean()
+            
+            print(f"\n📊 AVERAGE PERFORMANCE:")
+            print(f"   Single Rule   - F1: {avg_single_f1:.3f}, Mean Loss: ${avg_single_loss:,.0f}")
+            print(f"   Multi-Condition - F1: {avg_multi_f1:.3f}, Mean Loss: ${avg_multi_loss:,.0f}")
+            
+            f1_improvement = ((avg_multi_f1 - avg_single_f1) / avg_single_f1 * 100) if avg_single_f1 > 0 else 0
+            loss_improvement = ((avg_single_loss - avg_multi_loss) / avg_single_loss * 100) if avg_single_loss > 0 else 0
+            
+            print(f"\n🎯 OVERALL IMPROVEMENT (Multi vs Single):")
+            print(f"   F1 Score: {f1_improvement:+.1f}%")
+            print(f"   Mean Loss: {loss_improvement:+.1f}%")
+        
+        # Show detailed comparison table
+        display_cols = ['run_dir', 'method', 'rule_type', 'obs_f1', 'mean_loss', 'obs_tp', 'obs_fp', 'obs_fn']
+        display_comparison = improvement_df[display_cols].copy()
+        
+        print(f"\n📋 DETAILED COMPARISON BY RUN:")
+        print(display_comparison.to_string(index=False))
+        
+    else:
+        print("⚠️ Could not create improvement comparison - insufficient data")
+
+else:
+    print("⚠️ No multi-condition results found in any runs")
+
+print(f"\n✅ Multi-condition analysis complete!")
+print("="*80)
+# %%

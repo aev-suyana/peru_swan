@@ -49,7 +49,6 @@ class EnhancedFeatureSelectionConfig:
 # (Restored from SWAN_MOD_rule_evaluation_v3.py)
 # ============================================================================
 
-import os
 import re
 import glob
 import numpy as np
@@ -737,7 +736,6 @@ Date: 2024
 
 import pandas as pd
 import numpy as np
-import os
 from datetime import datetime
 from scipy import signal
 import warnings
@@ -1582,7 +1580,6 @@ def create_enhanced_features_reference_point(df_final):
 import re
 import pandas as pd
 import numpy as np
-import os
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -2161,9 +2158,9 @@ def enhanced_feature_selection_pipeline(X_train, y_train, top_k_per_method=200, 
     return final_features, voting_summary, enhanced_report
 
 # --- Enhanced Rule Combination Creation ---
-def create_enhanced_cv_rule_combinations(features, max_combinations=250):
-    """Create enhanced rule combinations"""
-    print("🔧 Creating enhanced rule combinations...")
+def create_enhanced_cv_rule_combinations(features, max_combinations=500):
+    """Create enhanced rule combinations with expanded complexity and diversity."""
+    print("🔧 Creating enhanced rule combinations (expanded)...")
     rules = []
     # 1. Single feature rules
     for feature in features:
@@ -2173,201 +2170,58 @@ def create_enhanced_cv_rule_combinations(features, max_combinations=250):
             'name': f'{feature} > threshold'
         })
     print(f"✅ Added {len(features)} single-feature rules")
-    # 2. Smart feature pairing
+    # 2. Pairwise AND/OR rules (expanded)
     two_feature_count = 0
-    max_two_feature = min(80, max_combinations // 3)
-    extreme_features = [f for f in features if re.search(r'_max_|_p(85|90|95)', f)][:8]
-    temporal_features = [f for f in features if re.search(r'_trend_|_persistence_|_change_', f)][:8]
-    anomaly_features = [f for f in features if 'anom_' in f][:5]
-    source_features = [f for f in features if re.search(r'_sw$|_wa', f)][:8]
-    pairings = [
-        (extreme_features, temporal_features, "extreme + temporal"),
-        (extreme_features, anomaly_features, "extreme + anomaly"),
-        (source_features[:4], temporal_features[:4], "source + temporal"),
-        (anomaly_features, temporal_features[:5], "anomaly + temporal")
-    ]
-    for group1, group2, description in pairings:
-        for f1 in group1:
-            for f2 in group2:
-                if two_feature_count >= max_two_feature:
-                    break
-                if f1 != f2:
-                    # AND rule
-                    rules.append({
-                        'type': 'and_2',
-                        'feature1': f1,
-                        'feature2': f2,
-                        'name': f'{f1} > t1 AND {f2} > t2'
-                    })
-                    two_feature_count += 1
-                    # OR rule (fewer of these)
-                    if two_feature_count < max_two_feature and np.random.random() < 0.3:
-                        rules.append({
-                            'type': 'or_2',
-                            'feature1': f1,
-                            'feature2': f2,
-                            'name': f'{f1} > t1 OR {f2} > t2'
-                        })
-                        two_feature_count += 1
-    print(f"✅ Added {two_feature_count} two-feature rules")
-    # 3. Limited three-feature combinations
-    three_feature_count = 0
-    max_three_feature = min(25, max_combinations // 8)
-    top_features = features[:12]
-    for i in range(0, min(9, len(top_features)), 3):
-        if three_feature_count >= max_three_feature:
-            break
-        if i+2 < len(top_features):
-            f1, f2, f3 = top_features[i], top_features[i+1], top_features[i+2]
+    max_two_feature = min(200, max_combinations // 2)
+    for i, f1 in enumerate(features):
+        for j, f2 in enumerate(features):
+            if f1 == f2 or two_feature_count >= max_two_feature:
+                continue
+            # AND rule
             rules.append({
-                'type': 'majority_3',
+                'type': 'and_2',
                 'feature1': f1,
                 'feature2': f2,
-                'feature3': f3,
-                'name': f'Majority of {f1}, {f2}, {f3}'
+                'name': f'{f1} > t1 AND {f2} > t2'
             })
-            three_feature_count += 1
-    print(f"✅ Added {three_feature_count} three-feature rules")
+            two_feature_count += 1
+            if two_feature_count < max_two_feature and (i+j) % 7 == 0:
+                # OR rule (sampled for diversity)
+                rules.append({
+                    'type': 'or_2',
+                    'feature1': f1,
+                    'feature2': f2,
+                    'name': f'{f1} > t1 OR {f2} > t2'
+                })
+                two_feature_count += 1
+    print(f"✅ Added {two_feature_count} two-feature rules")
+    # 3. Three-feature MAJORITY and piecewise rules
+    three_feature_count = 0
+    max_three_feature = min(60, max_combinations // 6)
+    for i in range(len(features)-2):
+        if three_feature_count >= max_three_feature:
+            break
+        f1, f2, f3 = features[i], features[i+1], features[i+2]
+        rules.append({
+            'type': 'majority_3',
+            'feature1': f1,
+            'feature2': f2,
+            'feature3': f3,
+            'name': f'Majority of {f1}, {f2}, {f3}'
+        })
+        three_feature_count += 1
+        # Piecewise rule: f1 > t1 if f2 > t2 else f1 > t3
+        rules.append({
+            'type': 'piecewise',
+            'feature1': f1,
+            'feature2': f2,
+            'name': f'{f1} > t1 if {f2} > t2 else {f1} > t3'
+        })
+        three_feature_count += 1
+    print(f"✅ Added {three_feature_count} three-feature/piecewise rules")
     print(f"🎯 Total enhanced rules: {len(rules)}")
     return rules
 
-# --- Enhanced Rule CV Evaluation Helper Functions ---
-
-def find_optimal_threshold(df_train, df_test, feature):
-    """Find threshold that maximizes F1 score for a feature"""
-    if feature not in df_test.columns or feature not in df_train.columns:
-        return None
-    train_feature = df_train[feature].dropna()
-    test_feature = df_test[feature].dropna()
-    if len(train_feature) < 5 or len(test_feature) < 5:
-        return None
-    if train_feature.std() < 1e-6:
-        return None
-    percentiles = list(range(10, 95, 5))  # 10% to 90% by 5%
-    try:
-        thresholds = [np.percentile(train_feature, p) for p in percentiles]
-        thresholds = sorted(list(set(thresholds)))
-    except:
-        return None
-    if len(thresholds) < 2:
-        return None
-    best_f1 = -1
-    best_threshold = None
-    y_true = df_test['event_dummy_1']
-    valid_predictions = 0
-    for threshold in thresholds:
-        try:
-            y_pred = (df_test[feature] > threshold).astype(int)
-            if y_pred.sum() == 0:
-                continue
-            accuracy = accuracy_score(y_true, y_pred)
-            if accuracy > 0.3:  # More lenient
-                f1 = f1_score(y_true, y_pred, zero_division=0)
-                valid_predictions += 1
-                if f1 > best_f1:
-                    best_f1 = f1
-                    best_threshold = threshold
-        except:
-            continue
-    if best_threshold is None and len(thresholds) > 0:
-        print(f"    DEBUG: Feature {feature[:30]}... - {len(thresholds)} thresholds tested, {valid_predictions} valid predictions, best_f1={best_f1:.3f}")
-    return best_threshold
-
-def evaluate_rule_cv_with_thresholds(rule, df, cv_splits):
-    """CV evaluation with threshold tracking"""
-    fold_results = []
-    fold_thresholds = []
-    for fold_idx, (train_idx, test_idx) in enumerate(cv_splits):
-        df_train_fold = df.iloc[train_idx]
-        df_test_fold = df.iloc[test_idx]
-        try:
-            thresholds_used = {}
-            if rule['type'] == 'single':
-                threshold = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature'])
-                if threshold is None:
-                    print(f"[DEBUG] Skipping fold {fold_idx} for rule {rule['name']} (no valid threshold found for {rule['feature']})")
-                    continue
-                thresholds_used[rule['feature']] = threshold
-                y_pred_series = apply_single_condition(df_test_fold, rule['feature'], threshold)
-            elif rule['type'] == 'and_2':
-                threshold1 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature1'])
-                threshold2 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature2'])
-                if threshold1 is None or threshold2 is None:
-                    continue
-                thresholds_used[rule['feature1']] = threshold1
-                thresholds_used[rule['feature2']] = threshold2
-                y_pred_series = apply_and_condition(df_test_fold, rule['feature1'], threshold1, rule['feature2'], threshold2)
-            elif rule['type'] == 'or_2':
-                threshold1 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature1'])
-                threshold2 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature2'])
-                if threshold1 is None or threshold2 is None:
-                    continue
-                thresholds_used[rule['feature1']] = threshold1
-                thresholds_used[rule['feature2']] = threshold2
-                y_pred_series = apply_or_condition(df_test_fold, rule['feature1'], threshold1, rule['feature2'], threshold2)
-            elif rule['type'] == 'majority_3':
-                threshold1 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature1'])
-                threshold2 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature2'])
-                threshold3 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature3'])
-                if any(t is None for t in [threshold1, threshold2, threshold3]):
-                    print(f"[DEBUG] Skipping fold {fold_idx} for rule {rule['name']} (no valid threshold for one of {rule['feature1']}, {rule['feature2']}, {rule['feature3']})")
-                    continue
-                thresholds_used[rule['feature1']] = threshold1
-                thresholds_used[rule['feature2']] = threshold2
-                thresholds_used[rule['feature3']] = threshold3
-                y_pred_series = apply_majority_condition(df_test_fold, rule['feature1'], threshold1, rule['feature2'], threshold2, rule['feature3'], threshold3)
-            else:
-                continue
-            # Calculate metrics
-            y_pred = y_pred_series.astype(int)
-            y_true = df_test_fold['event_dummy_1']
-            if len(y_true) > 0:
-                accuracy = accuracy_score(y_true, y_pred)
-                precision = precision_score(y_true, y_pred, zero_division=0)
-                recall = recall_score(y_true, y_pred, zero_division=0)
-                f1 = f1_score(y_true, y_pred, zero_division=0)
-                try:
-                    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
-                except:
-                    tn, fp, fn, tp = 0, 0, 0, 0
-                fold_results.append({
-                    'fold': fold_idx,
-                    'f1_score': f1,
-                    'precision': precision,
-                    'recall': recall,
-                    'accuracy': accuracy,
-                    'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn
-                })
-                fold_thresholds.append({
-                    'fold': fold_idx,
-                    'rule_type': rule['type'],
-                    'rule_name': rule['name'],
-                    'f1_score': f1,
-                    **thresholds_used
-                })
-        except Exception as e:
-            print(f"[DEBUG] Exception in fold {fold_idx} for rule {rule['name']}: {e}")
-            continue
-    # Aggregate results across folds
-    if len(fold_results) == 0:
-        return None, []
-    fold_df = pd.DataFrame(fold_results)
-    cv_result = {
-        'rule_type': rule['type'],
-        'rule_name': rule['name'],
-        'folds': len(fold_results),
-        'f1_mean': fold_df['f1_score'].mean(),
-        'f1_std': fold_df['f1_score'].std(),
-        'precision_mean': fold_df['precision'].mean(),
-        'recall_mean': fold_df['recall'].mean(),
-        'accuracy_mean': fold_df['accuracy'].mean(),
-        'tp_total': fold_df['tp'].sum(),
-        'fp_total': fold_df['fp'].sum(),
-        'tn_total': fold_df['tn'].sum(),
-        'fn_total': fold_df['fn'].sum(),
-        'n_folds_successful': len(fold_results),
-    }
-    return cv_result, fold_thresholds
 
 def apply_single_condition(df, feature, threshold):
     if feature not in df.columns or threshold is None:
@@ -2389,39 +2243,486 @@ def apply_or_condition(df, feature1, threshold1, feature2, threshold2):
     return (df[feature1] > threshold1) | (df[feature2] > threshold2)
 
 def apply_majority_condition(df, feature1, threshold1, feature2, threshold2, feature3, threshold3):
+    """
+    Apply majority voting condition with robust error handling
+    """
+    # Defensive: check columns and thresholds
     if any(f not in df.columns for f in [feature1, feature2, feature3]):
+        print(f"[DEBUG] Missing columns in majority condition: {[f for f in [feature1, feature2, feature3] if f not in df.columns]}")
         return pd.Series(False, index=df.index)
+    
     if any(t is None for t in [threshold1, threshold2, threshold3]):
+        print(f"[DEBUG] None thresholds in majority condition: {[threshold1, threshold2, threshold3]}")
         return pd.Series(False, index=df.index)
-    cond1 = (df[feature1] > threshold1).astype(int)
-    cond2 = (df[feature2] > threshold2).astype(int)
-    cond3 = (df[feature3] > threshold3).astype(int)
-    return (cond1 + cond2 + cond3) >= 2
+    
+    try:
+        # Create individual conditions with robust handling
+        conditions = []
+        
+        for i, (feature, threshold) in enumerate([(feature1, threshold1), (feature2, threshold2), (feature3, threshold3)], 1):
+            try:
+                # Check if feature exists and has valid data
+                if feature not in df.columns:
+                    print(f"[DEBUG] Feature {feature} not found in dataframe")
+                    cond = pd.Series(False, index=df.index)
+                elif df[feature].isnull().all():
+                    print(f"[DEBUG] Feature {feature} is all null")
+                    cond = pd.Series(False, index=df.index)
+                else:
+                    # Create condition safely
+                    cond = (df[feature] > threshold)
+                    
+                    # Ensure it's a proper Series
+                    if not isinstance(cond, pd.Series):
+                        print(f"[DEBUG] Condition {i} is not a Series, converting")
+                        cond = pd.Series(cond, index=df.index)
+                    
+                    # Fill any NaN values with False
+                    cond = cond.fillna(False)
+                
+                conditions.append(cond)
+                
+            except Exception as e:
+                print(f"[DEBUG] Error creating condition {i} for feature {feature}: {e}")
+                conditions.append(pd.Series(False, index=df.index))
+        
+        # Convert to integers safely
+        int_conditions = []
+        for i, cond in enumerate(conditions, 1):
+            try:
+                int_cond = cond.astype(int)
+                int_conditions.append(int_cond)
+            except Exception as e:
+                print(f"[DEBUG] Error converting condition {i} to int: {e}")
+                int_conditions.append(pd.Series(0, index=df.index))
+        
+        # Apply majority rule: at least 2 out of 3 conditions must be True
+        result = (int_conditions[0] + int_conditions[1] + int_conditions[2]) >= 2
+        
+        # Ensure result is boolean Series
+        if not isinstance(result, pd.Series):
+            result = pd.Series(result, index=df.index)
+            
+        return result.astype(bool)
+        
+    except Exception as e:
+        print(f"[DEBUG] apply_majority_condition exception: {e}")
+        print(f"[DEBUG] Features: {feature1}, {feature2}, {feature3}")
+        print(f"[DEBUG] Thresholds: {threshold1}, {threshold2}, {threshold3}")
+        return pd.Series(False, index=df.index)
+
+
+def find_optimal_threshold(df_train, df_test, feature, fine_grid=False, alt_name=None):
+    """
+    Find threshold that maximizes F1 score for a feature with better error handling
+    """
+    # Check if feature exists in both dataframes
+    if feature not in df_test.columns:
+        print(f"[DEBUG] Feature {feature} not found in test dataframe")
+        return None
+    if feature not in df_train.columns:
+        print(f"[DEBUG] Feature {feature} not found in train dataframe")
+        return None
+    
+    try:
+        train_feature = df_train[feature].dropna()
+        test_feature = df_test[feature].dropna()
+        
+        # Check for sufficient data
+        if len(train_feature) < 5:
+            print(f"[DEBUG] Insufficient training data for {feature}: {len(train_feature)} samples")
+            return None
+        if len(test_feature) < 5:
+            print(f"[DEBUG] Insufficient test data for {feature}: {len(test_feature)} samples")
+            return None
+        
+        # Check for variance
+        if train_feature.std() < 1e-6:
+            print(f"[DEBUG] No variance in training feature {feature}: std={train_feature.std()}")
+            return None
+            
+        # Generate thresholds
+        if fine_grid:
+            percentiles = list(range(5, 96, 2))  # 5% to 95% by 2% (more conservative)
+        else:
+            percentiles = list(range(10, 91, 10))  # 10% to 90% by 10%
+        
+        try:
+            thresholds = [np.percentile(train_feature, p) for p in percentiles]
+            thresholds = sorted(list(set(thresholds)))
+        except Exception as e:
+            print(f"[DEBUG] Error generating thresholds for {feature}: {e}")
+            return None
+        
+        if len(thresholds) < 2:
+            print(f"[DEBUG] Insufficient unique thresholds for {feature}: {len(thresholds)}")
+            return None
+        
+        # Find best threshold
+        best_f1 = -1
+        best_threshold = None
+        y_true = df_test['event_dummy_1']
+        valid_predictions = 0
+        
+        for threshold in thresholds:
+            try:
+                y_pred = (df_test[feature] > threshold).fillna(False).astype(int)
+                
+                if y_pred.sum() == 0:  # No positive predictions
+                    continue
+                    
+                # Check basic accuracy first
+                accuracy = accuracy_score(y_true, y_pred)
+                if accuracy < 0.2:  # Very lenient threshold
+                    continue
+                    
+                f1 = f1_score(y_true, y_pred, zero_division=0)
+                valid_predictions += 1
+                
+                if f1 > best_f1:
+                    best_f1 = f1
+                    best_threshold = threshold
+                    
+            except Exception as e:
+                print(f"[DEBUG] Error evaluating threshold {threshold} for {feature}: {e}")
+                continue
+        
+        if best_threshold is None:
+            print(f"[DEBUG] No valid threshold found for {feature} - {len(thresholds)} thresholds tested, {valid_predictions} valid predictions")
+            return None
+            
+        return best_threshold
+        
+    except Exception as e:
+        print(f"[DEBUG] find_optimal_threshold failed for {feature}: {e}")
+        return None
+
+
+def evaluate_rule_cv_with_thresholds(rule, df, cv_splits):
+    """
+    CV evaluation with improved error handling for majority rules
+    """
+    fold_results = []
+    fold_thresholds = []
+    
+    for fold_idx, (train_idx, test_idx) in enumerate(cv_splits):
+        try:
+            df_train_fold = df.iloc[train_idx]
+            df_test_fold = df.iloc[test_idx]
+            thresholds_used = {}
+            
+            # Handle different rule types
+            if rule['type'] == 'single':
+                threshold = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature'], fine_grid=True)
+                if threshold is None:
+                    continue
+                thresholds_used[rule['feature']] = threshold
+                y_pred_series = apply_single_condition(df_test_fold, rule['feature'], threshold)
+                
+            elif rule['type'] == 'and_2':
+                threshold1 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature1'], fine_grid=True)
+                threshold2 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature2'], fine_grid=True)
+                if threshold1 is None or threshold2 is None:
+                    continue
+                thresholds_used[rule['feature1']] = threshold1
+                thresholds_used[rule['feature2']] = threshold2
+                y_pred_series = apply_and_condition(df_test_fold, rule['feature1'], threshold1, rule['feature2'], threshold2)
+                
+            elif rule['type'] == 'or_2':
+                threshold1 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature1'], fine_grid=True)
+                threshold2 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature2'], fine_grid=True)
+                if threshold1 is None or threshold2 is None:
+                    continue
+                thresholds_used[rule['feature1']] = threshold1
+                thresholds_used[rule['feature2']] = threshold2
+                y_pred_series = apply_or_condition(df_test_fold, rule['feature1'], threshold1, rule['feature2'], threshold2)
+                
+            elif rule['type'] == 'majority_3':
+                # Get thresholds for all three features
+                threshold1 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature1'], fine_grid=True)
+                threshold2 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature2'], fine_grid=True)
+                threshold3 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature3'], fine_grid=True)
+                
+                # Skip if any threshold is None
+                if any(t is None for t in [threshold1, threshold2, threshold3]):
+                    missing_features = []
+                    if threshold1 is None: missing_features.append(rule['feature1'])
+                    if threshold2 is None: missing_features.append(rule['feature2'])
+                    if threshold3 is None: missing_features.append(rule['feature3'])
+                    print(f"[DEBUG] Skipping fold {fold_idx} for majority rule - no valid thresholds for: {missing_features}")
+                    continue
+                    
+                thresholds_used[rule['feature1']] = threshold1
+                thresholds_used[rule['feature2']] = threshold2
+                thresholds_used[rule['feature3']] = threshold3
+                
+                # Apply majority condition with error handling
+                y_pred_series = apply_majority_condition(
+                    df_test_fold, 
+                    rule['feature1'], threshold1, 
+                    rule['feature2'], threshold2, 
+                    rule['feature3'], threshold3
+                )
+                
+            elif rule['type'] == 'piecewise':
+                threshold1 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature1'], fine_grid=True)
+                threshold2 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature2'], fine_grid=True)
+                threshold3 = find_optimal_threshold(df_train_fold, df_test_fold, rule['feature1'], fine_grid=True, alt_name='t3')
+                if any(t is None for t in [threshold1, threshold2, threshold3]):
+                    continue
+                thresholds_used[f"{rule['feature1']}_t1"] = threshold1
+                thresholds_used[f"{rule['feature2']}_t2"] = threshold2
+                thresholds_used[f"{rule['feature1']}_t3"] = threshold3
+                y_pred_series = apply_piecewise_condition(df_test_fold, rule['feature1'], threshold1, rule['feature2'], threshold2, threshold3)
+            else:
+                continue
+            
+            # Ensure y_pred_series is valid
+            if y_pred_series is None or not isinstance(y_pred_series, pd.Series):
+                print(f"[DEBUG] Invalid prediction series for rule {rule['name']} in fold {fold_idx}")
+                continue
+            
+            # Apply temporal smoothing
+            y_pred_series = temporal_smoothing(y_pred_series, window=2, min_consecutive=2)
+            
+            # Calculate metrics
+            y_pred = y_pred_series.astype(int)
+            y_true = df_test_fold['event_dummy_1']
+            
+            if len(y_true) > 0:
+                accuracy = accuracy_score(y_true, y_pred)
+                precision = precision_score(y_true, y_pred, zero_division=0)
+                recall = recall_score(y_true, y_pred, zero_division=0)
+                f1 = f1_score(y_true, y_pred, zero_division=0)
+                
+                try:
+                    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+                except:
+                    tn, fp, fn, tp = 0, 0, 0, 0
+                
+                fold_results.append({
+                    'fold': fold_idx,
+                    'f1_score': f1,
+                    'precision': precision,
+                    'recall': recall,
+                    'accuracy': accuracy,
+                    'tp': tp, 'fp': fp, 'tn': tn, 'fn': fn
+                })
+                
+                fold_thresholds.append({
+                    'fold': fold_idx,
+                    'rule_type': rule['type'],
+                    'rule_name': rule['name'],
+                    'f1_score': f1,
+                    **thresholds_used
+                })
+                
+        except Exception as e:
+            print(f"[DEBUG] Exception in fold {fold_idx} for rule {rule['name']}: {e}")
+            continue
+    
+    # Aggregate results across folds
+    if len(fold_results) == 0:
+        return None, []
+    
+    fold_df = pd.DataFrame(fold_results)
+    cv_result = {
+        'rule_type': rule['type'],
+        'rule_name': rule['name'],
+        'folds': len(fold_results),
+        'f1_mean': fold_df['f1_score'].mean(),
+        'f1_std': fold_df['f1_score'].std(),
+        'precision_mean': fold_df['precision'].mean(),
+        'recall_mean': fold_df['recall'].mean(),
+        'accuracy_mean': fold_df['accuracy'].mean(),
+        'tp_total': fold_df['tp'].sum(),
+        'fp_total': fold_df['fp'].sum(),
+        'tn_total': fold_df['tn'].sum(),
+        'fn_total': fold_df['fn'].sum(),
+        'n_folds_successful': len(fold_results),
+    }
+    
+    return cv_result, fold_thresholds
+
+
+def apply_piecewise_condition(df, feature1, t1, feature2, t2, t3):
+    # If feature2 > t2, use threshold t1 for feature1; else use t3 for feature1
+    mask = df[feature2] > t2
+    out = pd.Series(False, index=df.index)
+    out[mask] = df.loc[mask, feature1] > t1
+    out[~mask] = df.loc[~mask, feature1] > t3
+    return out
+
+def temporal_smoothing(y_pred_series, window=2, min_consecutive=2):
+    """Require rule to fire for at least min_consecutive days (or rolling mean > 0.5)."""
+    y = y_pred_series.astype(int).values
+    if min_consecutive > 1:
+        # Mark as 1 if at least min_consecutive consecutive 1s
+        from scipy.ndimage import label
+        labels, num = label(y)
+        for i in range(1, num+1):
+            idxs = np.where(labels == i)[0]
+            if len(idxs) >= min_consecutive:
+                y[idxs] = 1
+            else:
+                y[idxs] = 0
+        return pd.Series(y, index=y_pred_series.index)
+    elif window > 1:
+        # Use rolling mean as a soft smoother
+        y_smoothed = pd.Series(y, index=y_pred_series.index).rolling(window, min_periods=1).mean()
+        return (y_smoothed > 0.5).astype(int)
+    else:
+        return y_pred_series
+
+# --- Helper for piecewise rule application ---
+def apply_piecewise_condition(df, feature1, t1, feature2, t2, t3):
+    # If feature2 > t2, use threshold t1 for feature1; else use t3 for feature1
+    mask = df[feature2] > t2
+    out = pd.Series(False, index=df.index)
+    out[mask] = df.loc[mask, feature1] > t1
+    out[~mask] = df.loc[~mask, feature1] > t3
+    return out
+
+def apply_single_condition(df, feature, threshold):
+    if feature not in df.columns or threshold is None:
+        return pd.Series(False, index=df.index)
+    return df[feature] > threshold
+
+def apply_and_condition(df, feature1, threshold1, feature2, threshold2):
+    if any(f not in df.columns for f in [feature1, feature2]):
+        return pd.Series(False, index=df.index)
+    if threshold1 is None or threshold2 is None:
+        return pd.Series(False, index=df.index)
+    return (df[feature1] > threshold1) & (df[feature2] > threshold2)
+
+def apply_or_condition(df, feature1, threshold1, feature2, threshold2):
+    if any(f not in df.columns for f in [feature1, feature2]):
+        return pd.Series(False, index=df.index)
+    if threshold1 is None or threshold2 is None:
+        return pd.Series(False, index=df.index)
+    return (df[feature1] > threshold1) | (df[feature2] > threshold2)
 
 # --- Enhanced Rule CV Evaluation with Threshold Tracking ---
-def run_cv_evaluation_with_threshold_tracking(rules, df, cv_splits):
-    print("🚀 Starting CV...")
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
+
+def _evaluate_rule_wrapper(args):
+    rule, df, cv_splits = args
+    try:
+        return rule, *evaluate_rule_cv_with_thresholds(rule, df, cv_splits)
+    except Exception as e:
+        print(f"[ERROR] Rule {rule['name']} failed: {e}")
+        return rule, None, []
+
+def run_cv_evaluation_with_threshold_tracking(rules, df, cv_splits, ensemble_top_k=15, ensemble_vote_k=3, n_jobs=4):
+    print("🚀 Starting CV (parallel)...")
     results = []
     all_fold_thresholds = []
     best_f1_mean = 0
-    for i, rule in enumerate(rules):
-        if i % 20 == 0:
-            print(f"📊 Progress: {i}/{len(rules)} rules evaluated (Best mean F1: {best_f1_mean:.3f})")
-        result, fold_thresholds = evaluate_rule_cv_with_thresholds(rule, df, cv_splits)
-        if result is not None and result['n_folds_successful'] >= 3:
-            results.append(result)
-            all_fold_thresholds.extend(fold_thresholds)
-            if result['f1_mean'] > best_f1_mean:
-                best_f1_mean = result['f1_mean']
-                print(f"  🎯 New best mean F1: {best_f1_mean:.3f} (±{result['f1_std']:.3f}) - {result['rule_name'][:50]}...")
+    # Prepare arguments for parallel execution
+    args_list = [(rule, df, cv_splits) for rule in rules]
+    total = len(rules)
+    finished = 0
+    with ProcessPoolExecutor(max_workers=n_jobs or multiprocessing.cpu_count()) as executor:
+        futures = [executor.submit(_evaluate_rule_wrapper, args) for args in args_list]
+        for i, future in enumerate(as_completed(futures)):
+            rule, result, fold_thresholds = future.result()
+            finished += 1
+            if finished % 20 == 0 or finished == total:
+                print(f"📊 Progress: {finished}/{total} rules evaluated (Best mean F1: {best_f1_mean:.3f})")
+            if result is not None and result['n_folds_successful'] >= 3:
+                results.append(result)
+                all_fold_thresholds.extend(fold_thresholds)
+                if result['f1_mean'] > best_f1_mean:
+                    best_f1_mean = result['f1_mean']
+                    print(f"  🎯 New best mean F1: {best_f1_mean:.3f}")
+            else:
+                if result is None:
+                    print(f"[DEBUG] Rule {rule['name']} excluded: no valid folds (all folds skipped or errored)")
+                elif result['n_folds_successful'] < 3:
+                    print(f"[DEBUG] Rule {rule['name']} excluded: only {result['n_folds_successful']} valid folds (needs >= 3)")
+                elif result['f1_mean'] == 0:
+                    print(f"[DEBUG] Rule {rule['name']} excluded: mean F1=0 over {result['n_folds_successful']} folds")
+    # --- Step 1: Convert results to DataFrame ---
+    results_df = pd.DataFrame(results)
+    if results_df.empty:
+        print("❌ No valid rules after CV.")
+        return results, all_fold_thresholds, None
+
+    # --- Step 2: Stability filtering ---
+    # Keep rules with low F1 std and high min fold F1 (across folds)
+    stability_thresh = 0.18
+    min_folds = 4
+    stable_rules = results_df[(results_df['f1_std'] <= stability_thresh) & (results_df['n_folds_successful'] >= min_folds)]
+    if stable_rules.empty:
+        print("⚠️ No stable rules after filtering; skipping stability filter.")
+        stable_rules = results_df.copy()
+    print(f"✅ {len(stable_rules)} stable rules after filtering (std <= {stability_thresh}, folds >= {min_folds})")
+
+    # --- Step 3: Redundancy pruning ---
+    # Remove highly correlated rules by checking predictions overlap
+    # (for speed, only check top N by F1)
+    top_rules = stable_rules.sort_values('f1_mean', ascending=False).head(ensemble_top_k*2)
+    keep = []
+    preds_matrix = []
+    for _, row in top_rules.iterrows():
+        rule_name = row['rule_name']
+        rule_type = row['rule_type']
+        rule = next((r for r in rules if r['name'] == rule_name and r['type'] == rule_type), None)
+        if rule is None:
+            continue
+        # Use all data for predictions with best thresholds (use mean or majority)
+        # For simplicity, re-use best thresholds from CV (could be improved)
+        # (Here, just use the first fold's thresholds as a proxy)
+        fold_thresh = [ft for ft in all_fold_thresholds if ft['rule_name']==rule_name]
+        if not fold_thresh:
+            continue
+        ft = fold_thresh[0]
+        # Apply rule to full df
+        if rule['type'] == 'single':
+            pred = apply_single_condition(df, rule['feature'], ft[rule['feature']])
+        elif rule['type'] == 'and_2':
+            pred = apply_and_condition(df, rule['feature1'], ft[rule['feature1']], rule['feature2'], ft[rule['feature2']])
+        elif rule['type'] == 'or_2':
+            pred = apply_or_condition(df, rule['feature1'], ft[rule['feature1']], rule['feature2'], ft[rule['feature2']])
+        elif rule['type'] == 'majority_3':
+            pred = apply_majority_condition(df, rule['feature1'], ft[rule['feature1']], rule['feature2'], ft[rule['feature2']], rule['feature3'], ft[rule['feature3']])
+        elif rule['type'] == 'piecewise':
+            pred = apply_piecewise_condition(df, rule['feature1'], ft[f"{rule['feature1']}_t1"], rule['feature2'], ft[f"{rule['feature2']}_t2"], ft[f"{rule['feature1']}_t3"])
         else:
-            if result is None:
-                print(f"[DEBUG] Rule {rule['name']} excluded: no valid folds (all folds skipped or errored)")
-            elif result['n_folds_successful'] < 3:
-                print(f"[DEBUG] Rule {rule['name']} excluded: only {result['n_folds_successful']} valid folds (needs >= 3)")
-            elif result['f1_mean'] == 0:
-                print(f"[DEBUG] Rule {rule['name']} excluded: mean F1=0 over {result['n_folds_successful']} folds")
-    return results, all_fold_thresholds
+            continue
+        pred = pred.astype(int).values
+        # Check correlation with already kept rules
+        is_redundant = False
+        for prev in preds_matrix:
+            corr = np.corrcoef(prev, pred)[0,1] if np.std(prev) > 0 and np.std(pred) > 0 else 0
+            if corr > 0.95:
+                is_redundant = True
+                break
+        if not is_redundant:
+            keep.append((rule, pred, row['f1_mean']))
+            preds_matrix.append(pred)
+        if len(keep) >= ensemble_top_k:
+            break
+    print(f"✅ {len(keep)} non-redundant rules selected for ensemble")
+
+    # --- Step 4: Ensemble voting ---
+    # K-of-N voting: event if >= ensemble_vote_k of top rules fire
+    if not keep:
+        print("❌ No rules for ensemble voting.")
+        return results, all_fold_thresholds, None
+    ensemble_preds = np.sum([p for (_, p, _) in keep], axis=0) >= ensemble_vote_k
+    ensemble_df = pd.DataFrame({
+        'date': df['date'].values,
+        'ensemble_pred': ensemble_preds.astype(int)
+    })
+    # Optionally, add per-rule outputs
+    for idx, (rule, pred, f1) in enumerate(keep):
+        ensemble_df[f'rule_{idx+1}_pred'] = pred
+        ensemble_df[f'rule_{idx+1}_name'] = rule['name']
+        ensemble_df[f'rule_{idx+1}_f1'] = f1
+    print(f"✅ Ensemble voting complete (K={ensemble_vote_k}, N={len(keep)})")
+    return results, all_fold_thresholds, ensemble_df
 
 # --- Enhanced Rule Evaluation Pipeline ---
 def run_enhanced_cv_pipeline_fast(prediction_data):
@@ -2431,8 +2732,9 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
       1. Enhanced Feature Selection
       2. Rule Generation
       3. Rule Evaluation (CV)
+      4. Ensemble Voting Output
     Returns:
-      cv_df, stable_rules, selected_features, all_fold_thresholds
+      cv_df, stable_rules, selected_features, all_fold_thresholds, ensemble_df
     """
     print("🚀 FAST ENHANCED CV PIPELINE")
     print("="*80)
@@ -2470,47 +2772,103 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
     print("First 20 features:")
     for i, feat in enumerate(actual_features[:20]):
         print(f"  {i+1:2d}. {feat}")
-    # --- STEP 2: FEATURE SELECTION ---
+    # --- STEP 2: FEATURE SELECTION (with disk cache) ---
     print(f"\n{'='*60}")
     print("ENHANCED FEATURE SELECTION (SINGLE RUN)")
     print("="*60)
-    try:
-        # Use larger training set for feature selection
-        combined_train_idx = []
-        for i in range(min(3, len(cv_splits))):
-            train_idx, _ = cv_splits[i]
-            combined_train_idx.extend(train_idx)
-        combined_train_idx = list(set(combined_train_idx))
-        df_train_combined = df.iloc[combined_train_idx]
-        print(f"📊 Using {len(df_train_combined)} samples for feature selection...")
-        # Prepare features
-        exclude_cols = [
-            'date', 'port_name', 'event_dummy_1', 'total_obs',
-            'duracion', 'year', 'latitude', 'longitude'
-        ]
-        feature_cols = [col for col in df.columns 
-                       if col not in exclude_cols 
-                       and df[col].dtype in ['float64', 'int64']]
-        X_train = df_train_combined[feature_cols].fillna(0)
-        y_train = df_train_combined['event_dummy_1']
-        print(f"📊 Evaluating {len(feature_cols)} candidate features...")
-        # Run enhanced feature selection ONCE
-        selected_features, voting_summary, report = enhanced_feature_selection_pipeline(
-            X_train, y_train, 
-            top_k_per_method=350,
-            final_top_k=TOP_K_FEATURES
-        )
-        print(f"✅ Enhanced feature selection complete: {len(selected_features)} features")
-        # Check if the best original features made it through selection
-        best_original_features = ['swh_median_wa', 'swh_p80_wa', 'swh_max_wa', 'anom_swh_p25_sw']
-        print("🔍 Did best original features survive selection?")
-        for feat in best_original_features:
-            if feat in selected_features:
-                print(f"  ✅ {feat} - SELECTED")
-            else:
-                print(f"  ❌ {feat} - EXCLUDED!")
-    except Exception as e:
-        print(f"❌ Enhanced feature selection failed: {e}")
+    import hashlib
+    import pickle
+    # Use RUN_PATH or a hash of the features file for cache naming
+    run_id = getattr(config, 'RUN_PATH', None) or 'default_run'
+    results_dir = os.path.join('results', 'feature_selection_cache')
+    os.makedirs(results_dir, exist_ok=True)
+    cache_file = os.path.join(results_dir, f'selected_features_{run_id}.csv')
+    selected_features = None
+    voting_summary = None
+    report = None
+    if os.path.exists(cache_file):
+        print(f"🗄️  Loading selected features from cache: {cache_file}")
+        selected_features = pd.read_csv(cache_file)['feature'].tolist()
+        # Optionally, you could also cache voting_summary and report with pickle if needed
+    else:
+        try:
+            # Use larger training set for feature selection
+            combined_train_idx = []
+            for i in range(min(3, len(cv_splits))):
+                train_idx, _ = cv_splits[i]
+                combined_train_idx.extend(train_idx)
+            combined_train_idx = list(set(combined_train_idx))
+            df_train_combined = df.iloc[combined_train_idx]
+            print(f"📊 Using {len(df_train_combined)} samples for feature selection...")
+            # Prepare features
+            exclude_cols = [
+                'date', 'port_name', 'event_dummy_1', 'total_obs',
+                'duracion', 'year', 'latitude', 'longitude'
+            ]
+            feature_cols = [col for col in df.columns 
+                           if col not in exclude_cols 
+                           and df[col].dtype in ['float64', 'int64']]
+            X_train = df_train_combined[feature_cols].fillna(0)
+            y_train = df_train_combined['event_dummy_1']
+            print(f"📊 Evaluating {len(feature_cols)} candidate features...")
+            # Run enhanced feature selection ONCE
+            selected_features, voting_summary, report = enhanced_feature_selection_pipeline(
+                X_train, y_train, 
+                top_k_per_method=350,
+                final_top_k=TOP_K_FEATURES
+            )
+            print(f"✅ Enhanced feature selection complete: {len(selected_features)} features")
+            # Save to cache
+            pd.DataFrame({'feature': selected_features}).to_csv(cache_file, index=False)
+            print(f"💾 Selected features cached to: {cache_file}")
+        except Exception as e:
+            print(f"❌ Enhanced feature selection failed: {e}")
+            print("Falling back to quick correlation selection...")
+            # Quick fallback
+            exclude_cols = [
+                'date', 'port_name', 'event_dummy_1', 'total_obs',
+                'duracion', 'year', 'latitude', 'longitude'
+            ]
+            all_features = [col for col in df.columns 
+                           if col not in exclude_cols 
+                           and df[col].dtype in ['float64', 'int64']]
+            # Domain boost patterns for quick selection
+            boost_patterns = {
+                'max_waves': (r'swh_max_sw|swe_max_sw|swh_max_wa|swe_max_wa', 4.0),
+                'swan_features': (r'_sw', 3.5),
+                'high_percentiles': (r'_p(80|90|95)', 3.0),
+                'trends': (r'_trend_(3|5|7|14)', 2.5),
+                'persistence': (r'_persistence_(5|7|14)', 2.3),
+                'anomalies': (r'anom_', 3.5),
+                'volatility': (r'_iqr|_std|_cv', 2.5)
+            }
+            feature_scores = []
+            y = df['event_dummy_1']
+            for feature in all_features:
+                try:
+                    corr = abs(df[feature].fillna(0).corr(y))
+                    if pd.isna(corr):
+                        continue
+                    boost = 1.0
+                    for pattern_name, (regex, boost_factor) in boost_patterns.items():
+                        if re.search(regex, feature):
+                            boost *= boost_factor
+                    final_score = corr * boost
+                    feature_scores.append((feature, final_score))
+                except:
+                    continue
+            feature_scores.sort(key=lambda x: x[1], reverse=True)
+            selected_features = [f for f, _ in feature_scores[:TOP_K_FEATURES]]
+            pd.DataFrame({'feature': selected_features}).to_csv(cache_file, index=False)
+            print(f"✅ Quick selection: {len(selected_features)} features (cached)")
+    # Check if the best original features made it through selection
+    best_original_features = ['swh_median_wa', 'swh_p80_wa', 'swh_max_wa', 'anom_swh_p25_sw']
+    print("🔍 Did best original features survive selection?")
+    for feat in best_original_features:
+        if feat in selected_features:
+            print(f"  ✅ {feat} - SELECTED")
+        else:
+            print(f"  ❌ {feat} - EXCLUDED!")
         print("Falling back to quick correlation selection...")
         # Quick fallback
         exclude_cols = [
@@ -2560,10 +2918,19 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
     print("RUNNING CROSS-VALIDATION EVALUATION")
     print("="*60)
     print(f"⏱️ Evaluating {len(rules)} rules across {N_FOLDS} folds...")
-    cv_results, all_fold_thresholds = run_cv_evaluation_with_threshold_tracking(
+    cv_results, all_fold_thresholds, ensemble_df = run_cv_evaluation_with_threshold_tracking(
         rules, df, cv_splits
     )
-    # --- STEP 5: PROCESS RULE EVALUATION RESULTS ---
+    # --- STEP 5: SAVE ENSEMBLE OUTPUT ---
+    results_dir = os.path.join('results')
+    os.makedirs(results_dir, exist_ok=True)
+    ensemble_path = os.path.join(results_dir, 'ensemble_predictions.csv')
+    if ensemble_df is not None:
+        ensemble_df.to_csv(ensemble_path, index=False)
+        print(f"✅ Ensemble predictions saved: {ensemble_path}")
+    else:
+        print("⚠️ No ensemble predictions to save.")
+    # --- STEP 6: PROCESS RULE EVALUATION RESULTS ------
     if len(cv_results) == 0:
         print("❌ No valid rules found!")
         return pd.DataFrame(), pd.DataFrame(), [], []
@@ -3005,5 +3372,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-else:
-    main()
+

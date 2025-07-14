@@ -1,0 +1,4 @@
+Method,Source_File,Obs_TP,Obs_FP,Obs_TN,Obs_FN,Sim_TP,Sim_FP,Sim_TN,Sim_FN,Accuracy,Precision,Recall,Specificity,F1_Score,Obs_Total_Events,Obs_Predicted_Events,Obs_Event_Rate,Obs_Prediction_Rate
+Single Rule (Best: anom_swh_mean_waverys),aep_multi_threshold_full_summary_20250709_235316.csv,69,199,2095,201,5.916,19.0785,0.0,14.23625,0.844,0.257,0.256,0.913,0.257,270,268,0.105,0.105
+Multi-Rule (double_AND): anom_swh_p80_swan & anom_swh_max_swan,direct_calculation,128,560,1734,142,0.0,0.0,0.0,0.0,0.726,0.186,0.474,0.756,0.267,270,688,0.105,0.268
+Machine Learning (Full Dataset CV),full_dataset_cv_calculation,95,409,1885,175,0.0,0.0,0.0,0.0,0.772,0.188,0.352,0.822,0.245,270,504,0.105,0.197

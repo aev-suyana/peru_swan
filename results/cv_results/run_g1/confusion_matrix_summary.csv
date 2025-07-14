@@ -1,0 +1,4 @@
+Method,Obs_TP,Obs_FP,Obs_TN,Obs_FN,Accuracy,Precision,Recall,F1_Score
+Single Rule (Best: swh_min_waverys),34,191,2319,13,0.92,0.151,0.723,0.25
+Multi-Rule (double_AND): anom_swh_min_swan & swh_max_swan,4,23,2487,43,0.974,0.148,0.085,0.108
+Machine Learning (Full Dataset CV),16,40,2470,31,0.972,0.286,0.34,0.311

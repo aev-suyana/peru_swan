@@ -1,0 +1,3 @@
+type,description,f1_score,mean_loss,zero_prob
+triple_AND,anom_swe_min AND anom_swe_p80 AND anom_swh_p80_waverys,0.4444444444444444,96087.65,0.01
+triple_AND_OR,anom_swe_min AND anom_swe_p80 OR anom_swe_max,0.28426395939086296,249210.65,0.0

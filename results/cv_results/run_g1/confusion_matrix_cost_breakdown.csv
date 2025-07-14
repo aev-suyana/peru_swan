@@ -1,0 +1,5 @@
+Component,Description,Annual_Cost,Percentage_of_Closure_Cost,Cost_K,Impact,Cost_Type
+False Positive (FP),Port closes unnecessarily (false alarms),2436619,79.3%,$2437K,Economic loss from missed fishing opportunities,Closure Cost
+True Positive (TP),Port closes correctly (successful predictions),634960,20.7%,$635K,Necessary cost to protect fishermen safety,Closure Cost
+TOTAL CLOSURE COST (FP + TP),Combined cost of all closure decisions,3071579,100.0%,$3072K,Total annual cost of closure system,Closure Cost
+False Negative (FN),Port stays open when dangerous (missed events),605254,N/A (separate),$605K,Safety risk and potential emergency costs,Separate Analysis

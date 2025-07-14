@@ -1713,7 +1713,7 @@ def generate_bootstrap_indices_simple(n_days, n_simulations, block_length):
     return simulation_indices
 
 def calculate_fast_multi_rule_aep(df, rule_features, rule_operators, rule_logic_ops, 
-                                  thresholds, N, W, min_days, n_simulations=500):
+                                  thresholds, N, W, min_days, n_simulations=config.N_SIMULATIONS):
     """Fast AEP analysis for multi-rule combinations"""
     print(f"  🚀 Fast multi-rule AEP: {len(rule_features)} features, {n_simulations} sims")
     
@@ -1862,7 +1862,7 @@ def fast_multi_rule_main():
             aep_results = calculate_fast_multi_rule_aep(
                 df, combination['features'], combination['operators'], 
                 combination['logic_ops'], best_thresholds, N_PARAM, W_PARAM, 
-                config.MIN_DAYS, n_simulations=400
+                config.MIN_DAYS, n_simulations=config.N_SIMULATIONS
             )
             
             if aep_results is not None:
@@ -2346,7 +2346,7 @@ def enhanced_fast_multi_rule_main():
             aep_results = calculate_fast_multi_rule_aep(
                 df, combination['features'], combination['operators'], 
                 combination['logic_ops'], best_thresholds, N_PARAM, W_PARAM, 
-                config.MIN_DAYS, n_simulations=400
+                config.MIN_DAYS, n_simulations=config.N_SIMULATIONS
             )
             
             if aep_results is not None:

@@ -2,23 +2,23 @@ BEST LOGISTIC REGRESSION MODEL INFO
 ========================================
 
 Feature Set: GLOBAL
-LR Variant: L2_Strong
-CV F1 Score: 0.321 ± 0.098
-Optimal Threshold: 0.110
-LR Parameters: {'penalty': 'l2', 'solver': 'lbfgs', 'max_iter': 2000, 'C': 0.1}
+LR Variant: L1
+CV F1 Score: 0.318 ± 0.091
+Optimal Threshold: 0.112
+LR Parameters: {'penalty': 'l1', 'solver': 'liblinear', 'max_iter': 2000, 'C': 1.0}
 Features (15):
-  - anom_swh_p80_deseasonalized_detrended_rel_change_14_lag_5
-  - clima_swh_mean_deseasonalized_detrended_rolling_mean_14_lag_7
-  - clima_swh_mean_deseasonalized_detrended_rolling_mean_14_lag_3
-  - clima_swh_mean_deseasonalized_detrended_persistence_14_lag_5
-  - swh_min_persistence_2
-  - anom_swh_p80_deseasonalized_detrended_rel_change_5_lag_14
-  - day_of_year
-  - clima_swh_mean_deseasonalized_detrended_rolling_mean_7_lag_5
-  - clima_swh_mean_deseasonalized_detrended_rel_change_3_lag_14
-  - clima_swh_mean_deseasonalized_detrended_persistence_14_lag_7
-  - clima_swh_mean_deseasonalized_detrended_rel_change_14_lag_5
-  - anom_swh_p80_rel_change_14_lag_7
-  - anom_swh_min_deseasonalized_rel_change_3_lag_3
-  - clima_swh_mean_deseasonalized_detrended_rolling_mean_7_lag_7
-  - clima_swh_mean_deseasonalized_detrended_persistence_14
+  - anom_swh_p80_trend_5
+  - anom_swh_p80_deseasonalized_detrended_trend_5
+  - anom_swh_p80_deseasonalized_trend_5
+  - anom_swh_p80_trend_7
+  - anom_swh_p80_trend_3
+  - anom_swh_p80_deseasonalized_detrended_trend_7
+  - anom_swh_p80_deseasonalized_trend_7
+  - anom_swh_max_waverys
+  - anom_swh_p80_deseasonalized_detrended_trend_3
+  - anom_swh_p80_deseasonalized_trend_3
+  - anom_swh_max_swan
+  - anom_swh_p80_trend_3_lag_1
+  - anom_swh_p80_deseasonalized_detrended_trend_3_lag_1
+  - anom_swh_p80_deseasonalized_trend_3_lag_1
+  - anom_swh_p80_deseasonalized_detrended_persistence_5

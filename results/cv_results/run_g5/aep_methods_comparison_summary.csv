@@ -1,0 +1,4 @@
+Method,Mean_Annual_Loss,Mean_Loss_K,Color,Rank,Improvement_vs_Worst
+Multi-Rule (double_AND),570803.0660659341,$571K,#2E86AB,1,98.9
+Single Rule,886565.5332924915,$887K,#E74C3C,2,98.3
+Machine Learning,51237954.640785486,$51238K,#27AE60,3,0.0

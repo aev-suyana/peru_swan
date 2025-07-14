@@ -1,0 +1,21 @@
+combination_id,type,description,features,thresholds,f1_score,mean_loss,max_loss,zero_prob
+10,double_AND,anom_swe_min > t1 AND anom_swh_max_waverys > t2,"['anom_swe_min', 'anom_swh_max_waverys']","(np.float64(0.13375), np.float64(0.2903359374999999))",0.4583333333333333,81190.8,284880.0,0.015
+4,double_AND,anom_swe_min > t1 AND anom_swe_max > t2,"['anom_swe_min', 'anom_swe_max']","(np.float64(0.13375), np.float64(0.299828125))",0.45045045045045046,102942.575,273010.0,0.0125
+2,double_AND,anom_swe_min > t1 AND anom_swh_p80_waverys > t2,"['anom_swe_min', 'anom_swh_p80_waverys']","(np.float64(0.13375), np.float64(0.21457343749999988))",0.42735042735042733,116533.725,320490.0,0.005
+18,double_AND,anom_swe_p80 > t1 AND anom_swh_min_waverys > t2,"['anom_swe_p80', 'anom_swh_min_waverys']","(np.float64(0.24509531249999997), np.float64(0.11646093749999964))",0.43902439024390244,122913.85,320490.0,0.0025
+14,double_AND,anom_swe_p80 > t1 AND anom_swh_p80_waverys > t2,"['anom_swe_p80', 'anom_swh_p80_waverys']","(np.float64(0.24509531249999997), np.float64(0.21457343749999988))",0.381679389312977,136920.45,332360.0,0.0
+0,double_AND,anom_swe_min > t1 AND anom_swe_p80 > t2,"['anom_swe_min', 'anom_swe_p80']","(np.float64(0.13375), np.float64(0.24509531249999997))",0.41221374045801534,137306.225,320490.0,0.0025
+12,double_AND,anom_swe_min > t1 AND anom_swh_mean_waverys > t2,"['anom_swe_min', 'anom_swh_mean_waverys']","(np.float64(0.13375), np.float64(0.17249218749999992))",0.40310077519379844,138166.8,356100.0,0.005
+6,double_AND,anom_swe_min > t1 AND anom_swh_min_waverys > t2,"['anom_swe_min', 'anom_swh_min_waverys']","(np.float64(0.13375), np.float64(0.11646093749999964))",0.39999999999999997,147633.125,344230.0,0.0
+16,double_AND,anom_swe_p80 > t1 AND anom_swe_max > t2,"['anom_swe_p80', 'anom_swe_max']","(np.float64(0.24509531249999997), np.float64(0.299828125))",0.36879432624113484,152114.05,332360.0,0.0
+8,double_AND,anom_swe_min > t1 AND anom_swe_mean > t2,"['anom_swe_min', 'anom_swe_mean']","(np.float64(0.13375), np.float64(0.1951249999999999))",0.39473684210526316,171640.2,379840.0,0.0
+9,double_OR,anom_swe_min > t1 OR anom_swe_mean > t2,"['anom_swe_min', 'anom_swe_mean']","(np.float64(0.13375), np.float64(0.1951249999999999))",0.3147208121827411,251703.35,498540.0,0.0
+17,double_OR,anom_swe_p80 > t1 OR anom_swe_max > t2,"['anom_swe_p80', 'anom_swe_max']","(np.float64(0.24509531249999997), np.float64(0.299828125))",0.2679425837320574,269270.95,486670.0,0.0
+7,double_OR,anom_swe_min > t1 OR anom_swh_min_waverys > t2,"['anom_swe_min', 'anom_swh_min_waverys']","(np.float64(0.13375), np.float64(0.11646093749999964))",0.29906542056074764,280161.675,534150.0,0.0
+1,double_OR,anom_swe_min > t1 OR anom_swe_p80 > t2,"['anom_swe_min', 'anom_swe_p80']","(np.float64(0.13375), np.float64(0.24509531249999997))",0.2844036697247706,286630.825,534150.0,0.0
+15,double_OR,anom_swe_p80 > t1 OR anom_swh_p80_waverys > t2,"['anom_swe_p80', 'anom_swh_p80_waverys']","(np.float64(0.24509531249999997), np.float64(0.21457343749999988))",0.2648401826484018,289064.175,581630.0,0.0
+13,double_OR,anom_swe_min > t1 OR anom_swh_mean_waverys > t2,"['anom_swe_min', 'anom_swh_mean_waverys']","(np.float64(0.13375), np.float64(0.17249218749999992))",0.2909090909090909,290518.25,569760.0,0.0
+19,double_OR,anom_swe_p80 > t1 OR anom_swh_min_waverys > t2,"['anom_swe_p80', 'anom_swh_min_waverys']","(np.float64(0.24509531249999997), np.float64(0.11646093749999964))",0.2643171806167401,301676.05,593500.0,0.0
+3,double_OR,anom_swe_min > t1 OR anom_swh_p80_waverys > t2,"['anom_swe_min', 'anom_swh_p80_waverys']","(np.float64(0.13375), np.float64(0.21457343749999988))",0.2672413793103448,312655.8,617240.0,0.0
+5,double_OR,anom_swe_min > t1 OR anom_swe_max > t2,"['anom_swe_min', 'anom_swe_max']","(np.float64(0.13375), np.float64(0.299828125))",0.26050420168067223,321647.325,557890.0,0.0
+11,double_OR,anom_swe_min > t1 OR anom_swh_max_waverys > t2,"['anom_swe_min', 'anom_swh_max_waverys']","(np.float64(0.13375), np.float64(0.2903359374999999))",0.2450592885375494,348770.275,629110.0,0.0

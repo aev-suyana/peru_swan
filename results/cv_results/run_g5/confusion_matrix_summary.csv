@@ -1,0 +1,4 @@
+Method,Obs_TP,Obs_FP,Obs_TN,Obs_FN,Accuracy,Precision,Recall,F1_Score
+Single Rule (Best: swh_p75_swan),100,122,2222,113,0.908,0.45,0.469,0.46
+Multi-Rule (double_AND): anom_swh_min_swan & swh_max_swan,90,218,2126,123,0.867,0.292,0.423,0.345
+Machine Learning (2024 Only - Limited),23,44,285,14,0.842,0.343,0.622,0.442

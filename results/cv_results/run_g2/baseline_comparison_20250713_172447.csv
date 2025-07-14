@@ -1,0 +1,5 @@
+analysis_type,description,f1_score,mean_loss,improvement_vs_single
+single_rule,anom_swh_min_waverys > 0.0798,0.16786570743405277,1205001.7349142858,0.0
+multi_rule_top_1,anom_swh_min_waverys > t1 AND anom_swh_max_waverys > t2,0.296875,243425.9018571429,79.79870942887412
+multi_rule_top_2,anom_swh_mean_waverys > t1 AND anom_swh_max_waverys > t2,0.27586206896551724,295766.8228285715,75.45507078878936
+multi_rule_top_3,anom_swh_min_waverys > t1 AND anom_swh_p80_waverys > t2,0.3108108108108108,311666.3930571429,74.13560627949533

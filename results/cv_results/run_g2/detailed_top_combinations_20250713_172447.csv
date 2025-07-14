@@ -1,0 +1,4 @@
+rank,features,thresholds,f1_score,mean_loss,prediction_rate,total_predictions
+1,"['anom_swh_min_waverys', 'anom_swh_max_waverys']","(np.float64(0.20771093750000003), np.float64(0.4388984374999997))",0.296875,243425.9018571429,0.02933124755572937,75
+2,"['anom_swh_mean_waverys', 'anom_swh_max_waverys']","(np.float64(0.29010937499999984), np.float64(0.4388984374999997))",0.27586206896551724,295766.8228285715,0.03597966366836136,92
+3,"['anom_swh_min_waverys', 'anom_swh_p80_waverys']","(np.float64(0.20771093750000003), np.float64(0.3539765624999998))",0.3108108108108108,311666.3930571429,0.037152913570590536,95

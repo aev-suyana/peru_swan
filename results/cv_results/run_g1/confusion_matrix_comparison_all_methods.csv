@@ -1,0 +1,4 @@
+Method,Source_File,Obs_TP,Obs_FP,Obs_TN,Obs_FN,Sim_TP,Sim_FP,Sim_TN,Sim_FN,Accuracy,Precision,Recall,Specificity,F1_Score,Obs_Total_Events,Obs_Predicted_Events,Obs_Event_Rate,Obs_Prediction_Rate
+Single Rule (Best: swh_min_waverys),aep_multi_threshold_full_summary_MIN_DAYS_2_20250710_024316.csv,34,191,2319,13,2.49125,15.81275,0.0,1.48175,0.92,0.151,0.723,0.924,0.25,47,225,0.018,0.088
+Multi-Rule (double_AND): anom_swh_min_swan & swh_max_swan,direct_calculation,4,23,2487,43,0.0,0.0,0.0,0.0,0.974,0.148,0.085,0.991,0.108,47,27,0.018,0.011
+Machine Learning (Full Dataset CV),full_dataset_cv_calculation,16,40,2470,31,0.0,0.0,0.0,0.0,0.972,0.286,0.34,0.984,0.311,47,56,0.018,0.022

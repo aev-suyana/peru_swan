@@ -1,0 +1,4 @@
+rank,features,thresholds,f1_score,mean_loss,prediction_rate,total_predictions
+1,"['swh_max_swan', 'swh_p80_swan']","(np.float64(2.0149999), np.float64(1.94670002))",0.6325136612021858,283425.2629285714,0.3300743058271412,844
+2,"['swh_max_swan', 'anom_swh_p75']","(np.float64(2.0149999), np.float64(-0.0945104683958334))",0.6307277628032345,290153.90169642854,0.3378959718420024,864
+3,"['swh_max_swan', 'anom_swh_p80_swan']","(np.float64(2.0149999), np.float64(-0.07881248129166653))",0.6330645161290323,291494.0139642857,0.3394603050449746,868

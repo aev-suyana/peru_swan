@@ -2727,8 +2727,613 @@ def main():
 
     print("\n🎉 Multi-threshold AEP calculation completed!")
 
+
+# DIRECT FIX: Enhanced Multi-Rule Pipeline with Full AEP Analysis
+# Add this to your aep_calculation_experiment.py to replace the existing multi-rule function
+
+def enhanced_multi_rule_main_with_full_aep():
+    """
+    Enhanced Multi-Rule analysis with FULL AEP pipeline - generates complete simulation outputs
+    matching Single Rule format for proper comparison
+    """
+    print("\n🚀 ENHANCED MULTI-RULE AEP ANALYSIS WITH FULL SIMULATION")
+    print(f"Run: {config.RUN_PATH}")
+    print(f"Reference port: {config.reference_port}")
+
+    # Load input data
+    merged_path = os.path.join(config.run_output_dir, 'df_swan_waverys_merged.csv')
+    if not os.path.exists(merged_path):
+        print(f"❌ Input file not found: {merged_path}")
+        return
+    df = pd.read_csv(merged_path, parse_dates=['date'])
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    results_dir = config.results_output_dir
+
+    # Locate CV results
+    cv_files = [f for f in os.listdir(results_dir) if f.endswith('.csv') and 'cv_results' in f]
+    if not cv_files:
+        print(f"❌ No CV results found in {results_dir}")
+        return
+    cv_results_path = os.path.join(results_dir, sorted(cv_files)[-1])
+
+    # Setup observed events
+    observed_col = 'event_dummy_1' if 'event_dummy_1' in df.columns else None
+    observed_events = df.set_index('date')[observed_col] if observed_col else None
+
+    # Get top rules for combination testing
+    print("\n📋 Generating rule combinations...")
+    top_rules = generate_top_single_rules(cv_results_path, top_k=8)
+    double_combinations = generate_double_rule_combinations(top_rules, max_combinations=20)
+    
+    print(f"  Testing {len(double_combinations)} double rule combinations...")
+
+    # Find the best Multi-Rule combination first
+    best_combination = None
+    best_f1 = 0
+    
+    print("\n🔍 Finding best Multi-Rule combination...")
+    for i, combination in enumerate(double_combinations):
+        try:
+            # Optimize thresholds for this combination
+            if observed_events is not None:
+                best_thresholds, f1_score = optimize_thresholds_fast(
+                    df, combination, observed_events, threshold_grid_size=4
+                )
+                
+                if f1_score > best_f1:
+                    best_f1 = f1_score
+                    best_combination = {
+                        **combination,
+                        'thresholds': best_thresholds,
+                        'f1_score': f1_score
+                    }
+                    print(f"    🎯 New best: {combination['type']} F1={f1_score:.3f}")
+            
+        except Exception as e:
+            print(f"    ❌ Error with combination {i}: {e}")
+            continue
+    
+    if best_combination is None:
+        print("❌ No valid Multi-Rule combination found")
+        return
+    
+    print(f"\n✅ Best Multi-Rule: {best_combination['type']}")
+    print(f"   Features: {best_combination['features']}")
+    print(f"   Thresholds: {best_combination['thresholds']}")
+    print(f"   F1 Score: {best_combination['f1_score']:.3f}")
+
+    # NOW RUN FULL AEP ANALYSIS ON THE BEST COMBINATION
+    print(f"\n🚀 Running FULL AEP analysis on best Multi-Rule combination...")
+    
+    # Create a custom multi-rule trigger function
+    def create_multi_rule_trigger_series(df_data, combination):
+        """Create a trigger series for multi-rule evaluation"""
+        features = combination['features']
+        thresholds = combination['thresholds'] 
+        rule_type = combination['type']
+        
+        if len(features) != len(thresholds):
+            raise ValueError("Features and thresholds length mismatch")
+        
+        # Apply rule logic
+        if 'AND' in rule_type:
+            trigger = df_data[features[0]] > thresholds[0]
+            for i in range(1, len(features)):
+                trigger = trigger & (df_data[features[i]] > thresholds[i])
+        elif 'OR' in rule_type:
+            trigger = df_data[features[0]] > thresholds[0]
+            for i in range(1, len(features)):
+                trigger = trigger | (df_data[features[i]] > thresholds[i])
+        else:
+            raise ValueError(f"Unknown rule type: {rule_type}")
+        
+        return trigger.astype(int)
+    
+    # Create the trigger series for the best combination
+    try:
+        swh_data = df.set_index('date')
+        multi_rule_trigger = create_multi_rule_trigger_series(df, best_combination)
+        
+        # We need to adapt the AEP analysis to work with a pre-computed trigger series
+        # instead of a single feature + threshold
+        
+        print(f"🔧 Running FULL AEP simulation with {config.N_SIMULATIONS} simulations...")
+        
+        # Use the enhanced AEP analysis but adapted for multi-rule
+        multi_rule_aep_results = calculate_multi_rule_aep_with_full_simulation(
+            swh_data=swh_data,
+            trigger_series=multi_rule_trigger,
+            combination_info=best_combination,
+            N=N_PARAM,
+            W=W_PARAM,
+            min_days=config.MIN_DAYS,
+            n_simulations=config.N_SIMULATIONS,
+            observed_events=observed_events,
+            block_length=config.BLOCK_LENGTH,
+            window_days=config.WINDOW_DAYS,
+            n_jobs=-1
+        )
+        
+        if multi_rule_aep_results is None:
+            print("❌ Multi-Rule AEP simulation failed")
+            return
+        
+        # Save comprehensive results (same format as Single Rule)
+        multi_summary_path = os.path.join(results_dir, f'multi_rule_aep_summary_{timestamp}.csv')
+        multi_curve_path = os.path.join(results_dir, f'multi_rule_aep_curve_{timestamp}.csv')
+        
+        # Save main summary
+        summary_data = multi_rule_aep_results['standard_summary'].copy()
+        summary_data.update({
+            'rule_type': best_combination['type'],
+            'rule_description': best_combination.get('description', 'Multi-condition rule'),
+            'features': str(best_combination['features']),
+            'thresholds': str(best_combination['thresholds']),
+            'f1_score': best_combination['f1_score']
+        })
+        
+        pd.DataFrame([summary_data]).to_csv(multi_summary_path, index=False)
+        multi_rule_aep_results['standard_aep_curve'].to_csv(multi_curve_path, index=False)
+        
+        print(f"✅ Saved Multi-Rule AEP summary: {multi_summary_path}")
+        print(f"✅ Saved Multi-Rule AEP curve: {multi_curve_path}")
+        
+        # Save observed yearly losses (same as Single Rule)
+        if 'obs_yearly_losses' in multi_rule_aep_results:
+            obs_losses_df = pd.DataFrame(
+                list(multi_rule_aep_results['obs_yearly_losses'].items()),
+                columns=['year', 'observed_loss']
+            )
+            obs_losses_path = os.path.join(results_dir, f'multi_rule_observed_yearly_losses_{timestamp}.csv')
+            obs_losses_df.to_csv(obs_losses_path, index=False)
+            print(f"✅ Saved Multi-Rule observed yearly losses: {obs_losses_path}")
+        
+        # Save confusion matrix results if available
+        if multi_rule_aep_results.get('confusion_matrix_results'):
+            cm_results = multi_rule_aep_results['confusion_matrix_results']
+            
+            # Save individual CM curves
+            cm_results['fp_aep'].to_csv(
+                os.path.join(results_dir, f'multi_rule_fp_aep_curve_{timestamp}.csv'), index=False
+            )
+            cm_results['fn_aep'].to_csv(
+                os.path.join(results_dir, f'multi_rule_fn_aep_curve_{timestamp}.csv'), index=False
+            )
+            cm_results['tp_aep'].to_csv(
+                os.path.join(results_dir, f'multi_rule_tp_aep_curve_{timestamp}.csv'), index=False
+            )
+            
+            # Save CM summary
+            cm_summary_df = pd.DataFrame([cm_results['summary']])
+            cm_summary_path = os.path.join(results_dir, f'multi_rule_confusion_matrix_summary_{timestamp}.csv')
+            cm_summary_df.to_csv(cm_summary_path, index=False)
+            print(f"✅ Saved Multi-Rule confusion matrix analysis: {cm_summary_path}")
+        
+        # Print final summary
+        mean_loss = multi_rule_aep_results['standard_summary']['mean_loss']
+        max_loss = multi_rule_aep_results['standard_summary']['max_loss']
+        zero_prob = multi_rule_aep_results['standard_summary']['zero_prob']
+        
+        print(f"\n📊 MULTI-RULE AEP RESULTS:")
+        print(f"   Rule: {best_combination['type']} - {best_combination.get('description', 'Multi-condition')}")
+        print(f"   Mean Annual Loss: ${mean_loss:,.0f}")
+        print(f"   Max Annual Loss: ${max_loss:,.0f}")
+        print(f"   Zero Loss Probability: {zero_prob:.1%}")
+        print(f"   F1 Score: {best_combination['f1_score']:.3f}")
+        
+        if multi_rule_aep_results.get('confusion_matrix_results'):
+            cm_summary = multi_rule_aep_results['confusion_matrix_results']['summary']
+            print(f"   FP Cost: ${cm_summary['fp_costs']['mean']:,.0f}")
+            print(f"   FN Cost: ${cm_summary['fn_costs']['mean']:,.0f}")
+            print(f"   TP Cost: ${cm_summary['tp_costs']['mean']:,.0f}")
+        
+        return multi_rule_aep_results
+        
+    except Exception as e:
+        print(f"❌ Error in Multi-Rule AEP analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+# ENHANCEMENT: Modify existing working pipeline to generate complete metrics
+# This enhances calculate_fast_multi_rule_aep() and related functions
+
+def calculate_enhanced_multi_rule_aep(df, rule_features, rule_operators, rule_logic_ops, 
+                                      thresholds, N, W, min_days, n_simulations=4000):
+    """Enhanced version of the existing fast multi-rule AEP with complete metrics"""
+    print(f"  🚀 Enhanced multi-rule AEP: {len(rule_features)} features, {n_simulations} sims")
+    
+    # Prepare data (same as existing)
+    df_clean = df.copy().sort_values('date').reset_index(drop=True)
+    
+    # Check if all features exist
+    missing_features = [f for f in rule_features if f not in df_clean.columns]
+    if missing_features:
+        print(f"    ❌ Missing features: {missing_features}")
+        return None
+    
+    # Get observed events
+    if 'event_dummy_1' not in df_clean.columns:
+        print("❌ No observed events column found")
+        return None
+        
+    observed = df_clean['event_dummy_1'].astype(int)
+    print(f"📊 Observed events: {observed.sum()} out of {len(observed)} days")
+    
+    # Apply the multi-rule to get predictions on the full dataset
+    predictions_full = evaluate_multi_rule_fast(
+        df_clean, rule_features, rule_operators, rule_logic_ops, thresholds
+    )
+    
+    print(f"📊 Rule predictions: {predictions_full.sum()} out of {len(predictions_full)} days ({predictions_full.mean()*100:.1f}%)")
+    
+    if predictions_full.sum() == 0:
+        print("⚠️ Warning: Rule produces 0 predictions - this will result in 0 losses")
+    
+    # Calculate observed confusion matrix
+    obs_tp = int(np.sum((predictions_full == 1) & (observed == 1)))
+    obs_fp = int(np.sum((predictions_full == 1) & (observed == 0)))
+    obs_tn = int(np.sum((predictions_full == 0) & (observed == 0)))
+    obs_fn = int(np.sum((predictions_full == 0) & (observed == 1)))
+    
+    print(f"📊 Observed confusion matrix: TP={obs_tp}, FP={obs_fp}, TN={obs_tn}, FN={obs_fn}")
+    
+    # Extract feature matrices for simulation (same as existing)
+    feature_matrices = {}
+    for feature in rule_features:
+        feature_matrices[feature] = df_clean[feature].fillna(0).values.astype(np.float32)
+    
+    # Enhanced simulation with detailed tracking
+    print(f"🔄 Running enhanced simulation with detailed tracking...")
+    
+    annual_losses = []
+    annual_events = []
+    annual_fp_counts = []
+    annual_fn_counts = []
+    annual_tp_counts = []
+    annual_fp_costs = []
+    annual_fn_costs = []
+    annual_tp_costs = []
+    
+    # Use block bootstrap for proper temporal correlation
+    from datetime import datetime, timedelta
+    
+    # Simple block bootstrap indices generation
+    np.random.seed(42)  # For reproducibility
+    for sim_idx in range(n_simulations):
+        np.random.seed(sim_idx)  # Different seed per simulation
+        
+        try:
+            # Create annual simulation (365 days) using block sampling
+            sim_indices = []
+            block_length = 7  # Weekly blocks
+            
+            while len(sim_indices) < 365:
+                # Random starting position for block
+                start_idx = np.random.randint(0, max(1, len(df_clean) - block_length))
+                block_indices = list(range(start_idx, min(start_idx + block_length, len(df_clean))))
+                sim_indices.extend(block_indices)
+            
+            # Trim to exactly 365 days
+            sim_indices = sim_indices[:365]
+            
+            # Sample feature values for this simulation
+            sampled_features = {}
+            for feature in rule_features:
+                sampled_features[feature] = feature_matrices[feature][sim_indices]
+            
+            # Create simulation DataFrame
+            sim_df = pd.DataFrame(sampled_features)
+            
+            # Apply rule to simulation
+            sim_predictions = evaluate_multi_rule_fast(
+                sim_df, rule_features, rule_operators, rule_logic_ops, thresholds
+            )
+            
+            # Sample corresponding observed events
+            sim_observed = observed.iloc[sim_indices].values[:365]
+            
+            # Calculate annual loss
+            total_loss = calculate_annual_loss_jit(sim_predictions, N, W, min_days)
+            annual_losses.append(total_loss)
+            
+            # Count events
+            annual_events.append(sim_predictions.sum())
+            
+            # Calculate confusion matrix for this simulation
+            sim_tp = int(np.sum((sim_predictions == 1) & (sim_observed == 1)))
+            sim_fp = int(np.sum((sim_predictions == 1) & (sim_observed == 0)))
+            sim_fn = int(np.sum((sim_predictions == 0) & (sim_observed == 1)))
+            
+            annual_tp_counts.append(sim_tp)
+            annual_fp_counts.append(sim_fp)
+            annual_fn_counts.append(sim_fn)
+            
+            # Calculate costs for each confusion matrix component
+            fp_cost, fn_cost, tp_cost = calculate_cm_costs_jit(
+                sim_predictions, sim_observed, N, W, min_days
+            )
+            annual_fp_costs.append(fp_cost)
+            annual_fn_costs.append(fn_cost)
+            annual_tp_costs.append(tp_cost)
+            
+        except Exception as e:
+            # Handle failures gracefully
+            annual_losses.append(0)
+            annual_events.append(0)
+            annual_tp_counts.append(0)
+            annual_fp_counts.append(0)
+            annual_fn_counts.append(0)
+            annual_fp_costs.append(0)
+            annual_fn_costs.append(0)
+            annual_tp_costs.append(0)
+    
+    # Convert to numpy arrays for analysis
+    annual_losses = np.array(annual_losses)
+    annual_events = np.array(annual_events)
+    annual_fp_counts = np.array(annual_fp_counts)
+    annual_fn_counts = np.array(annual_fn_counts)
+    annual_tp_counts = np.array(annual_tp_counts)
+    annual_fp_costs = np.array(annual_fp_costs)
+    annual_fn_costs = np.array(annual_fn_costs)
+    annual_tp_costs = np.array(annual_tp_costs)
+    
+    print(f"✅ Completed {len(annual_losses)} simulations")
+    
+    # Calculate AEP curve
+    losses_sorted = np.sort(annual_losses)[::-1]
+    exceedance_prob = np.arange(1, len(losses_sorted)+1) / (len(losses_sorted)+1)
+    
+    aep_curve = pd.DataFrame({
+        'loss': losses_sorted,
+        'probability': exceedance_prob
+    })
+    
+    # Calculate comprehensive summary with all the missing metrics
+    summary = {
+        'mean_loss': float(np.mean(annual_losses)),
+        'std_loss': float(np.std(annual_losses)),
+        'max_loss': float(np.max(annual_losses)),
+        'min_loss': float(np.min(annual_losses)),
+        'zero_prob': float(np.mean(annual_losses == 0)),
+        'p99_loss': float(np.percentile(annual_losses, 99)),
+        
+        # Event metrics
+        'mean_events': float(np.mean(annual_events)),
+        'std_events': float(np.std(annual_events)),
+        'p99_events': float(np.percentile(annual_events, 99)),
+        'max_events': float(np.max(annual_events)),
+        
+        # Confusion matrix event counts
+        'mean_tp': float(np.mean(annual_tp_counts)),
+        'mean_fp': float(np.mean(annual_fp_counts)),
+        'mean_fn': float(np.mean(annual_fn_counts)),
+        'p99_tp': float(np.percentile(annual_tp_counts, 99)),
+        'p99_fp': float(np.percentile(annual_fp_counts, 99)),
+        'p99_fn': float(np.percentile(annual_fn_counts, 99)),
+        
+        # Confusion matrix costs
+        'mean_tp_cost': float(np.mean(annual_tp_costs)),
+        'mean_fp_cost': float(np.mean(annual_fp_costs)),
+        'mean_fn_cost': float(np.mean(annual_fn_costs)),
+        'p99_tp_cost': float(np.percentile(annual_tp_costs, 99)),
+        'p99_fp_cost': float(np.percentile(annual_fp_costs, 99)),
+        'p99_fn_cost': float(np.percentile(annual_fn_costs, 99)),
+        
+        # Observed confusion matrix
+        'obs_tp': obs_tp,
+        'obs_fp': obs_fp,
+        'obs_tn': obs_tn,
+        'obs_fn': obs_fn,
+        
+        # Performance metrics
+        'obs_precision': obs_tp / (obs_tp + obs_fp) if (obs_tp + obs_fp) > 0 else 0,
+        'obs_recall': obs_tp / (obs_tp + obs_fn) if (obs_tp + obs_fn) > 0 else 0,
+        'obs_accuracy': (obs_tp + obs_tn) / len(observed) if len(observed) > 0 else 0,
+        'obs_f1': 2 * obs_tp / (2 * obs_tp + obs_fp + obs_fn) if (2 * obs_tp + obs_fp + obs_fn) > 0 else 0,
+        
+        # Metadata
+        'method': 'enhanced_multi_rule_block_bootstrap',
+        'rule_features': rule_features,
+        'thresholds': thresholds,
+        'min_days': min_days,
+        'n_fishermen': N,
+        'daily_wage': W,
+        'n_simulations': len(annual_losses)
+    }
+    
+    return {
+        'summary': summary,
+        'aep_curve': aep_curve,
+        'annual_losses': annual_losses,
+        'annual_events': annual_events,
+        'annual_fp_costs': annual_fp_costs,
+        'annual_fn_costs': annual_fn_costs,
+        'annual_tp_costs': annual_tp_costs,
+        'distributions': {
+            'losses': annual_losses,
+            'events': annual_events,
+            'tp_counts': annual_tp_counts,
+            'fp_counts': annual_fp_counts,
+            'fn_counts': annual_fn_counts
+        }
+    }
+
+# Enhanced version of the main multi-rule function
+def enhanced_multi_rule_main_keeping_working_parts():
+    """
+    Enhanced version that keeps the working rule evaluation but adds complete simulation outputs
+    """
+    print("\n🚀 ENHANCED MULTI-RULE AEP ANALYSIS (Keeping Working Parts)")
+    print(f"Run: {config.RUN_PATH}")
+    print(f"Reference port: {config.reference_port}")
+
+    # Load input data (same as working version)
+    merged_path = os.path.join(config.run_output_dir, 'df_swan_waverys_merged.csv')
+    if not os.path.exists(merged_path):
+        print(f"❌ Input file not found: {merged_path}")
+        return
+    df = pd.read_csv(merged_path, parse_dates=['date'])
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    results_dir = config.results_output_dir
+
+    # Locate CV results (same as working version)
+    cv_files = [f for f in os.listdir(results_dir) if f.endswith('.csv') and 'cv_results' in f]
+    if not cv_files:
+        print(f"❌ No CV results found in {results_dir}")
+        return
+    cv_results_path = os.path.join(results_dir, sorted(cv_files)[-1])
+
+    # Setup observed events (same as working version)
+    observed_col = 'event_dummy_1' if 'event_dummy_1' in df.columns else None
+    observed_events = df.set_index('date')[observed_col] if observed_col else None
+
+    # Get top rules (same as working version)
+    print("\n📋 Generating rule combinations...")
+    top_rules = generate_top_single_rules(cv_results_path, top_k=6)
+    if len(top_rules) == 0:
+        print("❌ No single rules found")
+        return
+    
+    print(f"  Top features: {[r['feature'] for r in top_rules[:3]]}")
+    
+    # Generate combinations (same as working version)
+    double_combinations = generate_double_rule_combinations(top_rules, max_combinations=15)
+    print(f"  Testing {len(double_combinations)} double rule combinations...")
+
+    # Find best combination (same as working version)
+    best_results = []
+    for i, combination in enumerate(double_combinations):
+        print(f"\n--- {i+1}/{len(double_combinations)}: {combination['type']} ---")
+        
+        try:
+            # Optimize thresholds (same as working version)
+            if observed_events is not None:
+                best_thresholds, best_score = optimize_thresholds_fast(
+                    df, combination, observed_events, threshold_grid_size=4
+                )
+                print(f"    F1: {best_score:.3f}")
+            else:
+                best_thresholds = []
+                for feature in combination['features']:
+                    if feature in df.columns:
+                        best_thresholds.append(np.percentile(df[feature].dropna(), 75))
+                    else:
+                        best_thresholds.append(0.0)
+                best_score = 0.0
+            
+            # NEW: Run enhanced AEP analysis instead of fast version
+            aep_results = calculate_enhanced_multi_rule_aep(
+                df, combination['features'], combination['operators'], 
+                combination['logic_ops'], best_thresholds, N_PARAM, W_PARAM, 
+                config.MIN_DAYS, n_simulations=config.N_SIMULATIONS
+            )
+            
+            if aep_results is not None:
+                result = {
+                    'combination_id': i,
+                    'type': combination['type'],
+                    'description': combination['description'],
+                    'features': combination['features'],
+                    'thresholds': best_thresholds,
+                    'f1_score': best_score,
+                    **aep_results['summary']  # Include ALL the enhanced metrics
+                }
+                best_results.append(result)
+                print(f"    ✅ Mean loss: ${result['mean_loss']:,.0f}")
+            else:
+                print(f"    ❌ Failed")
+                
+        except Exception as e:
+            print(f"    ❌ Error: {e}")
+
+    # Process and save results (enhanced version)
+    if best_results:
+        results_df = pd.DataFrame(best_results).sort_values('mean_loss')
+        
+        # Get the best result for detailed outputs
+        best_result = results_df.iloc[0]
+        
+        # Save enhanced summary with ALL metrics
+        summary_path = os.path.join(results_dir, f'enhanced_multi_rule_complete_summary_{timestamp}.csv')
+        results_df.to_csv(summary_path, index=False)
+        
+        # NEW: Save individual outputs for the best rule (matching Single Rule format)
+        best_combination_idx = best_result['combination_id']
+        best_combination = double_combinations[best_combination_idx]
+        
+        # Re-run the best combination to get detailed outputs
+        print(f"\n🎯 Generating detailed outputs for best combination...")
+        best_thresholds = best_result['thresholds']
+        
+        detailed_aep_results = calculate_enhanced_multi_rule_aep(
+            df, best_combination['features'], best_combination['operators'], 
+            best_combination['logic_ops'], best_thresholds, N_PARAM, W_PARAM, 
+            config.MIN_DAYS, n_simulations=config.N_SIMULATIONS
+        )
+        
+        if detailed_aep_results:
+            # Save AEP curve (matching Single Rule format)
+            curve_path = os.path.join(results_dir, f'multi_rule_aep_curve_{timestamp}.csv')
+            detailed_aep_results['aep_curve'].to_csv(curve_path, index=False)
+            
+            # Save detailed summary (matching Single Rule format)
+            detailed_summary_path = os.path.join(results_dir, f'multi_rule_aep_summary_{timestamp}.csv')
+            pd.DataFrame([detailed_aep_results['summary']]).to_csv(detailed_summary_path, index=False)
+            
+            # Save observed yearly losses if available
+            if observed_events is not None:
+                obs_yearly_losses = {}
+                df_with_date = df.set_index('date')
+                years = df_with_date.index.year
+                observed_aligned = observed_events.reindex(df_with_date.index, fill_value=0)
+                
+                for year in np.unique(years):
+                    mask = (years == year)
+                    obs_loss = calculate_annual_loss_jit(
+                        observed_aligned.values[mask], N_PARAM, W_PARAM, config.MIN_DAYS
+                    )
+                    obs_yearly_losses[int(year)] = float(obs_loss)
+                
+                obs_losses_df = pd.DataFrame(
+                    list(obs_yearly_losses.items()), 
+                    columns=['year', 'observed_loss']
+                )
+                obs_losses_path = os.path.join(results_dir, f'multi_rule_observed_yearly_losses_{timestamp}.csv')
+                obs_losses_df.to_csv(obs_losses_path, index=False)
+                print(f"✅ Saved observed yearly losses: {obs_losses_path}")
+            
+            print(f"✅ Saved enhanced AEP curve: {curve_path}")
+            print(f"✅ Saved enhanced AEP summary: {detailed_summary_path}")
+        
+        # Print comprehensive results
+        print(f"\n🏆 TOP 5 ENHANCED MULTI-RULE COMBINATIONS:")
+        print("=" * 70)
+        for i, (_, row) in enumerate(results_df.head(5).iterrows(), 1):
+            print(f"{i}. {row['type']}: {row['description']}")
+            print(f"   F1: {row['f1_score']:.3f} | Mean Loss: ${row['mean_loss']:,.0f}")
+            print(f"   Events: {row['mean_events']:.1f} | Zero Prob: {row['zero_prob']:.1%}")
+            print(f"   CM: TP={row['mean_tp']:.1f}, FP={row['mean_fp']:.1f}, FN={row['mean_fn']:.1f}")
+            print()
+        
+        print(f"✅ Results saved: {summary_path}")
+        return results_df
+    else:
+        print("❌ No successful analyses")
+        return None
+
+# USAGE: Replace the call in __main__ section:
+# if __name__ == "__main__":
+#     enhanced_multi_rule_main_keeping_working_parts()
+
+# USAGE: Replace the call to enhanced_fast_multi_rule_main() in your main execution
+# with enhanced_multi_rule_main_with_full_aep()
 # if __name__ == "__main__":
 #     main()
 
 if __name__ == "__main__":
-    enhanced_fast_multi_rule_main()
+    # enhanced_fast_multi_rule_main()
+    enhanced_multi_rule_main_keeping_working_parts()
+

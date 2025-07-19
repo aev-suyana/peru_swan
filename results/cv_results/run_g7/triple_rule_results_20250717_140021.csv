@@ -1,0 +1,3 @@
+type,description,f1_score,mean_loss,zero_prob
+triple_AND,anom_swe_p80 AND anom_swe_mean AND swh_p80_swan,0.4087705559906029,355299.45,0.0
+triple_AND_OR,anom_swe_p80 AND anom_swe_mean OR swh_max_swan,0.411873840445269,75626.57142857143,0.0

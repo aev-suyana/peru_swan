@@ -1,0 +1,21 @@
+combination_id,type,description,features,thresholds,f1_score,mean_loss,max_loss,zero_prob
+16,double_AND,anom_swe_mean > t1 AND swh_max_swan > t2,"['anom_swe_mean', 'swh_max_swan']","(np.float64(0.01015625), np.float64(1.34))",0.4670781893004115,237144.83142857137,375488.5714285715,0.0
+14,double_AND,anom_swe_mean > t1 AND swh_p80_swan > t2,"['anom_swe_mean', 'swh_p80_swan']","(np.float64(0.01015625), np.float64(1.2793333880000002))",0.46417759838546924,242934.49499999994,372844.2857142858,0.0
+4,double_AND,anom_swe_p80 > t1 AND swh_max_swan > t2,"['anom_swe_p80', 'swh_max_swan']","(np.float64(0.031703125), np.float64(1.34))",0.4576612903225806,245238.32892857137,380777.1428571427,0.0
+12,double_AND,anom_swe_p80 > t1 AND anom_swh_min_waverys > t2,"['anom_swe_p80', 'anom_swh_min_waverys']","(np.float64(0.031703125), np.float64(-0.04921093749999989))",0.44950495049504957,249018.33535714282,367555.71428571444,0.0
+2,double_AND,anom_swe_p80 > t1 AND swh_p80_swan > t2,"['anom_swe_p80', 'swh_p80_swan']","(np.float64(0.031703125), np.float64(1.2793333880000002))",0.4603174603174603,249877.7282142857,380777.1428571427,0.0
+10,double_AND,anom_swe_p80 > t1 AND anom_swh_mean_swan > t2,"['anom_swe_p80', 'anom_swh_mean_swan']","(np.float64(0.031703125), np.float64(0.055624997916666634))",0.4349514563106796,257161.41321428565,378132.8571428571,0.0
+18,double_AND,anom_swe_mean > t1 AND anom_swh_p75 > t2,"['anom_swe_mean', 'anom_swh_p75']","(np.float64(0.01015625), np.float64(0.09555558125000004))",0.4418604651162791,257370.9728571428,383421.42857142864,0.0
+8,double_AND,anom_swe_p80 > t1 AND anom_swh_p80_swan > t2,"['anom_swe_p80', 'anom_swh_p80_swan']","(np.float64(0.031703125), np.float64(0.10752361881249989))",0.44061302681992337,262436.76321428566,380777.14285714296,0.0
+6,double_AND,anom_swe_p80 > t1 AND anom_swh_p75 > t2,"['anom_swe_p80', 'anom_swh_p75']","(np.float64(0.031703125), np.float64(0.09555558125000004))",0.44126074498567336,263576.4503571428,380777.1428571429,0.0
+0,double_AND,anom_swe_p80 > t1 AND anom_swe_mean > t2,"['anom_swe_p80', 'anom_swe_mean']","(np.float64(0.031703125), np.float64(0.01015625))",0.41803989592367735,303948.7435714285,420441.42857142846,0.0
+1,double_OR,anom_swe_p80 > t1 OR anom_swe_mean > t2,"['anom_swe_p80', 'anom_swe_mean']","(np.float64(0.13684843749999984), np.float64(0.01015625))",0.4090177133655395,337137.83464285714,457461.42857142846,0.0
+19,double_OR,anom_swe_mean > t1 OR anom_swh_p75 > t2,"['anom_swe_mean', 'anom_swh_p75']","(np.float64(0.01015625), np.float64(0.43247921449999993))",0.4096385542168675,338255.04535714287,457461.42857142846,0.0
+15,double_OR,anom_swe_mean > t1 OR swh_p80_swan > t2,"['anom_swe_mean', 'swh_p80_swan']","(np.float64(0.1081562499999996), np.float64(1.2793333880000002))",0.4305220883534137,338861.90892857144,507702.85714285716,0.0
+3,double_OR,anom_swe_p80 > t1 OR swh_p80_swan > t2,"['anom_swe_p80', 'swh_p80_swan']","(np.float64(0.13684843749999984), np.float64(1.2793333880000002))",0.4305220883534137,338861.90892857144,507702.85714285716,0.0
+9,double_OR,anom_swe_p80 > t1 OR anom_swh_p80_swan > t2,"['anom_swe_p80', 'anom_swh_p80_swan']","(np.float64(0.031703125), np.float64(0.44569027772916625))",0.40930979133226325,339993.00214285706,457461.4285714286,0.0
+11,double_OR,anom_swe_p80 > t1 OR anom_swh_mean_swan > t2,"['anom_swe_p80', 'anom_swh_mean_swan']","(np.float64(0.031703125), np.float64(0.358930506458333))",0.4077046548956661,339996.9685714286,457461.4285714287,0.0
+7,double_OR,anom_swe_p80 > t1 OR anom_swh_p75 > t2,"['anom_swe_p80', 'anom_swh_p75']","(np.float64(0.031703125), np.float64(0.43247921449999993))",0.40898155573376105,340376.4235714285,457461.4285714287,0.0
+13,double_OR,anom_swe_p80 > t1 OR anom_swh_min_waverys > t2,"['anom_swe_p80', 'anom_swh_min_waverys']","(np.float64(0.13684843749999984), np.float64(-0.04921093749999989))",0.42448330683624796,342294.19178571436,468038.5714285716,0.0
+5,double_OR,anom_swe_p80 > t1 OR swh_max_swan > t2,"['anom_swe_p80', 'swh_max_swan']","(np.float64(0.13684843749999984), np.float64(1.34))",0.4245359160613398,342568.53642857145,523568.57142857165,0.0
+17,double_OR,anom_swe_mean > t1 OR swh_max_swan > t2,"['anom_swe_mean', 'swh_max_swan']","(np.float64(0.1081562499999996), np.float64(1.34))",0.4245359160613398,342568.53642857145,523568.57142857165,0.0

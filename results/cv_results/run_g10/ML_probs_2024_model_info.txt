@@ -3,22 +3,22 @@ BEST LOGISTIC REGRESSION MODEL INFO
 
 Feature Set: GLOBAL
 LR Variant: L2
-CV F1 Score: 0.673 ± 0.067
-Optimal Threshold: 0.329
+CV F1 Score: 0.643 ± 0.074
+Optimal Threshold: 0.314
 LR Parameters: {'penalty': 'l2', 'solver': 'lbfgs', 'max_iter': 2000, 'C': 1.0}
 Features (15):
-  - swh_max_swan
+  - anom_swh_p80_trend_5
+  - anom_swh_p80_trend_3
+  - anom_swh_p80_deseasonalized_detrended_trend_5
+  - anom_swh_p80_deseasonalized_trend_5
+  - anom_swh_p80_trend_7
+  - anom_swh_p80_deseasonalized_detrended_trend_3
+  - anom_swh_p80_deseasonalized_trend_3
+  - anom_swh_p80_deseasonalized_detrended_trend_7
+  - anom_swh_p80_deseasonalized_trend_7
+  - anom_swh_max_waverys
   - anom_swh_max_swan
-  - swh_mean_swan
-  - swh_max_waverys
-  - swh_p75_swan
-  - swh_median_swan
-  - anom_swh_p80_swan
-  - swh_min_swan
-  - swh_p25_swan
-  - anom_swh_p80_waverys
-  - anom_swh_p75
-  - swh_p80_swan
-  - duration_intensity_p60_swan
-  - anom_swh_p80_deseasonalized
-  - anom_swh_p75_deseasonalized
+  - anom_swh_p80_deseasonalized_persistence_5
+  - anom_swh_p80_persistence_5
+  - anom_swh_p80_deseasonalized_detrended_persistence_5
+  - anom_swh_p80_trend_14

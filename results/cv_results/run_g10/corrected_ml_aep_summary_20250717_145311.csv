@@ -1,0 +1,2 @@
+mean_loss,std_loss,max_loss,min_loss,zero_prob,method,n_simulations,mean_events_per_year,std_events_per_year,min_days,n_fishermen,daily_wage
+1583601.157583333,146985.081427449,2132445.3333333335,1041990.3333333335,0.0,independent_daily_probability_draws,4000,65.35075,6.065659439624022,1,523.0,46.333333333333336

@@ -1,0 +1,2 @@
+fp_costs,fn_costs,tp_costs,insurance_costs
+"{'mean': 0.0, 'std': 0.0, 'max': 0.0, 'zero_prob': 1.0}","{'mean': 925397.4260647622, 'std': 139545.8909840039, 'max': 1397687.771428572, 'zero_prob': 0.0}","{'mean': 0.0, 'std': 0.0, 'max': 0.0, 'zero_prob': 1.0}","{'mean': 0.0, 'std': 0.0, 'max': 0.0, 'zero_prob': 1.0}"

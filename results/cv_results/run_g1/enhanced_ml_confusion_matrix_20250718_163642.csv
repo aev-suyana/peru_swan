@@ -1,0 +1,2 @@
+obs_tp,obs_fp,obs_tn,obs_fn,obs_precision,obs_recall,obs_accuracy,obs_f1,mean_tp_cost,mean_fp_cost,mean_fn_cost,p99_tp_cost,p99_fp_cost,p99_fn_cost,mean_tp,mean_fp,mean_fn,p99_tp,p99_fp,p99_fn,total_mean_cost,optimal_threshold
+2,64,287,13,0.030303030303030304,0.13333333333333333,0.7896174863387978,0.04938271604938271,11340.0,12513.103448275862,18427.5,11340.0,39690.0,34020.0,1.0,29.0,4.0,1.0,29.0,4.0,42280.60344827586,0.31359999999999977

@@ -1,0 +1,3 @@
+type,description,f1_score,mean_loss,zero_prob
+triple_AND,swh_max_swan AND swh_p80_swan AND anom_swh_max_waverys,0.594960049170252,1784148.4402285719,0.0
+triple_AND_OR,swh_max_swan AND swh_p80_swan OR anom_swh_p80_waverys,0.567915036333147,2056173.4227428576,0.0

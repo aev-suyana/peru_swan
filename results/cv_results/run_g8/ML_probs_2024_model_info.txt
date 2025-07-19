@@ -2,23 +2,23 @@ BEST LOGISTIC REGRESSION MODEL INFO
 ========================================
 
 Feature Set: GLOBAL
-LR Variant: L1
-CV F1 Score: 0.652 ± 0.048
-Optimal Threshold: 0.284
-LR Parameters: {'penalty': 'l1', 'solver': 'liblinear', 'max_iter': 2000, 'C': 1.0}
+LR Variant: L2
+CV F1 Score: 0.612 ± 0.059
+Optimal Threshold: 0.308
+LR Parameters: {'penalty': 'l2', 'solver': 'lbfgs', 'max_iter': 2000, 'C': 1.0}
 Features (15):
+  - anom_swh_p80_trend_3
+  - anom_swh_p80_deseasonalized_detrended_trend_3
+  - anom_swh_p80_deseasonalized_trend_3
+  - anom_swh_p80_trend_5
+  - anom_swh_p80_deseasonalized_detrended_trend_5
+  - anom_swh_p80_deseasonalized_trend_5
+  - anom_swh_p80_trend_7
+  - anom_swh_p80_deseasonalized_detrended_trend_7
+  - anom_swh_p80_deseasonalized_trend_7
   - anom_swh_max_waverys
-  - swh_mean_swan
-  - swh_p25_swan
-  - swh_median_swan
-  - swh_max_swan
   - anom_swh_max_swan
-  - anom_swh_p80_swan
-  - anom_swh_p80_deseasonalized
-  - anom_swh_p75
-  - anom_swh_p75_deseasonalized
-  - swh_p25_deseasonalized
-  - swh_p80_deseasonalized_detrended_abs_change_14
-  - anom_swh_p80_deseasonalized_detrended
-  - swh_median_waverys
-  - swh_p80_abs_change_14
+  - anom_swh_p80_trend_3_lag_1
+  - anom_swh_p80_waverys
+  - anom_swh_p80_deseasonalized_detrended_trend_3_lag_1
+  - anom_swh_p80_deseasonalized_trend_3_lag_1

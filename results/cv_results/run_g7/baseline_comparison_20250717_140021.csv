@@ -1,0 +1,5 @@
+analysis_type,description,f1_score,mean_loss,improvement_vs_single
+single_rule,anom_swe_p80 > 0.0651,0.4547677261613692,180393.17142857137,0.0
+multi_rule_top_1,anom_swe_mean > t1 AND swh_max_swan > t2,0.4670781893004115,237144.83142857137,-31.459982409850497
+multi_rule_top_2,anom_swe_mean > t1 AND swh_p80_swan > t2,0.46417759838546924,242934.49499999994,-34.66945177367342
+multi_rule_top_3,anom_swe_p80 > t1 AND swh_max_swan > t2,0.4576612903225806,245238.32892857137,-35.94656992084434

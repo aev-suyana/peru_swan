@@ -1,0 +1,9 @@
+{
+  "best_feature": "anom_swh_p80_persistence_5",
+  "daily_threshold": 0.25550169439916676,
+  "event_threshold": -0.2705206827108332,
+  "daily_event_capture": 0.8181818181818182,
+  "event_level_capture": 1.0,
+  "combined_score": 0.7303680981595092,
+  "selection_score": 0.6503680981595092
+}

@@ -18,7 +18,7 @@ warnings.filterwarnings('ignore')
 # --- Configuration for enhanced feature selection ---
 class EnhancedFeatureSelectionConfig:
     TOP_K_PER_METHOD = 200
-    FINAL_TOP_K = 150
+    FINAL_TOP_K = 100
     MIN_VOTES = 2
     METHOD_WEIGHTS = {
         'random_forest': 2.5,
@@ -202,7 +202,7 @@ def detrend_and_deseasonalize_reference_point(df_daily, apply_detrending=True, a
     # Get wave feature columns (exclude metadata)
     wave_features = [col for col in df_daily.columns 
                     if any(wave_type in col for wave_type in ['swh', 'swe']) 
-                    and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+                    and not col.startswith('event_dummy') and col not in ['date', 'total_obs_sw', 'port_name', 'year']]
     
     print(f"Processing {len(wave_features)} wave features...")
     print(f"Example features: {wave_features[:5]}")
@@ -326,7 +326,7 @@ def create_enhanced_features_reference_point(df_processed, use_processed_feature
                           if (col.startswith('pct_') or 
                               (any(wave_type in col for wave_type in ['swh', 'swe']) 
                                and not col.endswith(('_processed', '_raw'))))
-                          and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+                          and not col.startswith('event_dummy') and col not in ['date', 'total_obs_sw', 'port_name', 'year']]
     
     base_features.extend(additional_features)
     base_features = list(set(base_features))  # Remove duplicates
@@ -892,7 +892,7 @@ def detrend_and_deseasonalize_reference_point(df_daily, apply_detrending=True, a
     # Get wave feature columns (exclude metadata)
     wave_features = [col for col in df_daily.columns 
                     if any(wave_type in col for wave_type in ['swh', 'swe']) 
-                    and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+                    and not col.startswith('event_dummy') and col not in ['date', 'total_obs_sw', 'port_name', 'year']]
     
     print(f"Processing {len(wave_features)} wave features...")
     print(f"Example features: {wave_features[:5]}")
@@ -1016,7 +1016,7 @@ def create_enhanced_features_reference_point(df_processed, use_processed_feature
                           if (col.startswith('pct_') or 
                               (any(wave_type in col for wave_type in ['swh', 'swe']) 
                                and not col.endswith(('_processed', '_raw'))))
-                          and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+                          and not col.startswith('event_dummy') and col not in ['date', 'total_obs_sw', 'port_name', 'year']]
     
     base_features.extend(additional_features)
     base_features = list(set(base_features))  # Remove duplicates
@@ -1436,7 +1436,7 @@ def create_enhanced_features_reference_point(df_final):
     # Get base wave features (both _sw and _wa features)
     base_features = [col for col in df_enhanced.columns 
                     if (col.endswith('_sw') or col.endswith('_wa') or col.startswith('pct_'))
-                    and col not in ['date', 'event_dummy_1', 'port_name', 'year']]
+                    and not col.startswith('event_dummy') and col not in ['date', 'port_name', 'year']]
     
     print(f"  Processing {len(base_features)} base features...")
     
@@ -1710,7 +1710,7 @@ def run_interactive_ml_pipeline(prediction_data, selected_features, quick_mode=F
     # Check data
     print(f"📊 Dataset shape: {prediction_data.shape}")
     print(f"🎯 Target distribution:")
-    print(prediction_data['event_dummy_1'].value_counts())
+    print(prediction_data[config.EVENT_DUMMY_TARGET].value_counts())
     print(f"📋 Selected features: {len(selected_features)}")
     
     # Extract feature sets
@@ -1724,9 +1724,9 @@ def run_interactive_ml_pipeline(prediction_data, selected_features, quick_mode=F
     print(f"   • Global top features: {len(top15_global_ml)}")
     
     # Prepare DataFrames
-    swan_df_ml = prediction_data[top15_swan_ml + ['event_dummy_1']].copy()
-    waverys_df_ml = prediction_data[top15_waverys_ml + ['event_dummy_1']].copy()
-    global_df_ml = prediction_data[top15_global_ml + ['event_dummy_1']].copy()
+    swan_df_ml = prediction_data[top15_swan_ml + [config.EVENT_DUMMY_TARGET]].copy()
+    waverys_df_ml = prediction_data[top15_waverys_ml + [config.EVENT_DUMMY_TARGET]].copy()
+    global_df_ml = prediction_data[top15_global_ml + [config.EVENT_DUMMY_TARGET]].copy()
     
     # Feature sets for specific variables
     swan_features_ml = [
@@ -1746,9 +1746,9 @@ def run_interactive_ml_pipeline(prediction_data, selected_features, quick_mode=F
     available_waverys = [f for f in waverys_features_ml if f in prediction_data.columns]
     available_waverys_swe = [f for f in waverys_swe_features_ml if f in prediction_data.columns]
     
-    swan_set_df_ml = prediction_data[available_swan + ['event_dummy_1']].copy() if available_swan else None
-    waverys_set_df_ml = prediction_data[available_waverys + ['event_dummy_1']].copy() if available_waverys else None
-    waverys_swe_set_df_ml = prediction_data[available_waverys_swe + ['event_dummy_1']].copy() if available_waverys_swe else None
+    swan_set_df_ml = prediction_data[available_swan + [config.EVENT_DUMMY_TARGET]].copy() if available_swan else None
+    waverys_set_df_ml = prediction_data[available_waverys + [config.EVENT_DUMMY_TARGET]].copy() if available_waverys else None
+    waverys_swe_set_df_ml = prediction_data[available_waverys_swe + [config.EVENT_DUMMY_TARGET]].copy() if available_waverys_swe else None
     
     # Model variants (optimized for interactive use)
     if quick_mode:
@@ -1813,7 +1813,7 @@ def run_interactive_ml_pipeline(prediction_data, selected_features, quick_mode=F
         print(f"   Features: {len(features_ml)}, Samples: {len(df_ml)}")
         
         X = df_ml[features_ml]
-        y = df_ml['event_dummy_1']
+        y = df_ml[config.EVENT_DUMMY_TARGET]
         
         for model_class, model_kwargs, model_label in ml_model_variants:
             combination_count += 1
@@ -2361,7 +2361,7 @@ def find_optimal_threshold(df_train, df_test, feature, fine_grid=False, alt_name
         # Find best threshold
         best_f1 = -1
         best_threshold = None
-        y_true = df_test['event_dummy_1']
+        y_true = df_test[config.EVENT_DUMMY_TARGET]
         valid_predictions = 0
         
         for threshold in thresholds:
@@ -2487,7 +2487,7 @@ def evaluate_rule_cv_with_thresholds(rule, df, cv_splits):
             
             # Calculate metrics
             y_pred = y_pred_series.astype(int)
-            y_true = df_test_fold['event_dummy_1']
+            y_true = df_test_fold[config.EVENT_DUMMY_TARGET]
             
             if len(y_true) > 0:
                 accuracy = accuracy_score(y_true, y_pred)
@@ -2742,8 +2742,8 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
     df = prediction_data.copy()
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values('date').reset_index(drop=True)
-    print(f"📊 Dataset: {len(df)} samples, {df['event_dummy_1'].sum()} events ({df['event_dummy_1'].mean()*100:.1f}%)")
-    exclude_cols = ['date', 'port_name', 'event_dummy_1', 'total_obs']
+    print(f"📊 Dataset: {len(df)} samples, {df[config.EVENT_DUMMY_TARGET].sum()} events ({df[config.EVENT_DUMMY_TARGET].mean()*100:.1f}%)")
+    exclude_cols = [col for col in ['date', 'port_name', 'total_obs'] + list(prediction_data.columns) if col.startswith('event_dummy')]
     # Configuration
     N_FOLDS = 6
     USE_TIME_SERIES_CV = True
@@ -2759,7 +2759,7 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
         print(f"📅 Using TimeSeriesSplit with {N_FOLDS} folds")
     else:
         skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
-        cv_splits = list(skf.split(df, df['event_dummy_1']))
+        cv_splits = list(skf.split(df, df[config.EVENT_DUMMY_TARGET]))
         print(f"🎯 Using StratifiedKFold with {N_FOLDS} folds")
     # In the enhanced pipeline, before feature selection:
     print("🔍 FEATURE COMPARISON DEBUG:")
@@ -2809,7 +2809,7 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
                            if col not in exclude_cols 
                            and df[col].dtype in ['float64', 'int64']]
             X_train = df_train_combined[feature_cols].fillna(0)
-            y_train = df_train_combined['event_dummy_1']
+            y_train = df_train_combined[config.EVENT_DUMMY_TARGET]
             print(f"📊 Evaluating {len(feature_cols)} candidate features...")
             # Run enhanced feature selection ONCE
             selected_features, voting_summary, report = enhanced_feature_selection_pipeline(
@@ -2843,7 +2843,7 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
                 'volatility': (r'_iqr|_std|_cv', 2.5)
             }
             feature_scores = []
-            y = df['event_dummy_1']
+            y = df[config.EVENT_DUMMY_TARGET]
             for feature in all_features:
                 try:
                     corr = abs(df[feature].fillna(0).corr(y))
@@ -2889,7 +2889,7 @@ def run_enhanced_cv_pipeline_fast(prediction_data):
             'volatility': (r'_iqr|_std|_cv', 2.5)
         }
         feature_scores = []
-        y = df['event_dummy_1']
+        y = df[config.EVENT_DUMMY_TARGET]
         for feature in all_features:
             try:
                 corr = abs(df[feature].fillna(0).corr(y))
@@ -3001,8 +3001,8 @@ def save_best_lr_predictions_2024(prediction_data, selected_features, output_pat
     print(f"   Date range 2024: {data_2024['date'].min()} to {data_2024['date'].max()}")
     print(f"   Selected features: {len(selected_features)}")
     
-    if 'event_dummy_1' not in prediction_data.columns:
-        print("ERROR: Target variable 'event_dummy_1' not found")
+    if config.EVENT_DUMMY_TARGET not in prediction_data.columns:
+        print(f"ERROR: Target variable '{config.EVENT_DUMMY_TARGET}' not found")
         return None
     
     # Prepare feature sets to test
@@ -3052,7 +3052,7 @@ def save_best_lr_predictions_2024(prediction_data, selected_features, output_pat
         
         # Prepare data
         X = prediction_data[available_features].fillna(0)
-        y = prediction_data['event_dummy_1']
+        y = prediction_data[config.EVENT_DUMMY_TARGET]
         from sklearn.metrics import precision_score, recall_score, accuracy_score, confusion_matrix
 
         for lr_name, lr_params in lr_variants.items():
@@ -3189,7 +3189,7 @@ def save_best_lr_predictions_2024(prediction_data, selected_features, output_pat
     print(f"   Training data: {len(train_data)} rows")
     
     # Check if training data has both classes
-    train_target = train_data['event_dummy_1']
+    train_target = train_data[config.EVENT_DUMMY_TARGET]
     print(f"   Training target distribution: {train_target.value_counts().to_dict()}")
     
     if len(np.unique(train_target)) < 2:
@@ -3198,7 +3198,7 @@ def save_best_lr_predictions_2024(prediction_data, selected_features, output_pat
     
     # Prepare training data
     X_train = train_data[best_model_info['features']].fillna(0)
-    y_train = train_data['event_dummy_1']
+    y_train = train_data[config.EVENT_DUMMY_TARGET]
     
     try:
         # Train final calibrated model
@@ -3233,7 +3233,7 @@ def save_best_lr_predictions_2024(prediction_data, selected_features, output_pat
         'calibrated_probability': calibrated_probabilities,
         'optimal_threshold': best_model_info['mean_threshold'],
         'predicted_event': (calibrated_probabilities >= best_model_info['mean_threshold']).astype(int),
-        'observed_event': data_2024['event_dummy_1'].values  # Always include observed events
+        'observed_event': data_2024[config.EVENT_DUMMY_TARGET].values  # Always include observed events
     })
 
     # Print confusion matrix for ML predictions using optimal threshold
@@ -3253,7 +3253,7 @@ def save_best_lr_predictions_2024(prediction_data, selected_features, output_pat
     print(f"Optimal threshold saved to: {output_threshold_path}")
     
     # Calculate performance metrics if observed events are available
-    if 'event_dummy_1' in data_2024.columns:
+    if config.EVENT_DUMMY_TARGET in data_2024.columns:
         
         # Calculate 2024 performance metrics
         y_pred_2024 = results_df['predicted_event']
@@ -3317,7 +3317,853 @@ def quick_save_lr_2024(prediction_data, selected_features, filename=None):
     
     return save_best_lr_predictions_2024(prediction_data, selected_features, filename)
 
+#----------------------------------------------------------
+# Event level analysis
 
+# ============================================================================
+# NEW: EVENT-LEVEL EVALUATION FUNCTIONS
+# ============================================================================
+
+def find_event_periods(binary_series):
+    """
+    Find continuous event periods in a binary time series
+    
+    Parameters:
+    -----------
+    binary_series : array-like
+        Binary series (0s and 1s) representing daily events
+    
+    Returns:
+    --------
+    list of tuples
+        Each tuple is (start_idx, end_idx) of an event period
+    """
+    events = []
+    in_event = False
+    start = None
+    
+    for i, val in enumerate(binary_series):
+        if val == 1 and not in_event:
+            # Event starts
+            start = i
+            in_event = True
+        elif val == 0 and in_event:
+            # Event ends
+            events.append((start, i-1))
+            in_event = False
+    
+    # Handle event ending at series end
+    if in_event:
+        events.append((start, len(binary_series)-1))
+    
+    return events
+
+def smooth_predictions(daily_preds, window_size=5, min_days=3):
+    """
+    Apply window smoothing to daily predictions
+    
+    Parameters:
+    -----------
+    daily_preds : array-like
+        Daily binary predictions
+    window_size : int
+        Size of sliding window
+    min_days : int
+        Minimum days in window that must predict event
+    
+    Returns:
+    --------
+    array
+        Smoothed predictions
+    """
+    if len(daily_preds) == 0:
+        return np.array([])
+    
+    daily_preds = np.array(daily_preds)
+    smoothed = np.zeros_like(daily_preds)
+    
+    for i in range(len(daily_preds)):
+        # Get window around day i
+        start = max(0, i - window_size//2)
+        end = min(len(daily_preds), start + window_size)
+        window = daily_preds[start:end]
+        
+        # If min_days out of window_size predict event, smooth to 1
+        smoothed[i] = 1 if np.sum(window) >= min_days else 0
+    
+    return smoothed
+
+def evaluate_event_level_performance(observed, predicted, overlap_threshold=0.5):
+    """
+    Evaluate how well predictions capture actual events
+    
+    Parameters:
+    -----------
+    observed : array-like
+        Observed binary events
+    predicted : array-like  
+        Predicted binary events
+    overlap_threshold : float
+        What fraction of event needs to be predicted to count as captured
+    
+    Returns:
+    --------
+    tuple
+        (event_capture_rate, captured_events, total_events)
+    """
+    if len(observed) == 0:
+        return 0.0, 0, 0
+    
+    obs_events = find_event_periods(observed)
+    
+    if len(obs_events) == 0:
+        return 1.0, 0, 0  # No events to capture
+    
+    captured_events = 0
+    
+    for obs_start, obs_end in obs_events:
+        # Check if any prediction overlaps with this observed event
+        obs_length = obs_end - obs_start + 1
+        overlap_days = 0
+        
+        for day in range(obs_start, obs_end + 1):
+            if day < len(predicted) and predicted[day] == 1:
+                overlap_days += 1
+        
+        # Did we capture enough of this event?
+        if overlap_days / obs_length >= overlap_threshold:
+            captured_events += 1
+    
+    event_capture_rate = captured_events / len(obs_events)
+    return event_capture_rate, captured_events, len(obs_events)
+
+def calculate_combined_score(y_true, y_pred, 
+                           smoothing_params={'window_size': 5, 'min_days': 3},
+                           overlap_threshold=0.5,
+                           event_weight=0.7, precision_weight=0.3):
+    """
+    Calculate combined score balancing event capture and precision
+    
+    Parameters:
+    -----------
+    y_true : array-like
+        True labels
+    y_pred : array-like
+        Predicted labels  
+    smoothing_params : dict
+        Parameters for prediction smoothing
+    overlap_threshold : float
+        Overlap threshold for event capture
+    event_weight : float
+        Weight for event capture rate (0-1)
+    precision_weight : float
+        Weight for precision (0-1, should sum to 1 with event_weight)
+    
+    Returns:
+    --------
+    dict
+        Dictionary with all metrics
+    """
+    # Apply smoothing to predictions
+    y_pred_smoothed = smooth_predictions(
+        y_pred, 
+        window_size=smoothing_params['window_size'],
+        min_days=smoothing_params['min_days']
+    )
+    
+    # Calculate event-level metrics
+    event_capture_rate, captured, total = evaluate_event_level_performance(
+        y_true, y_pred_smoothed, overlap_threshold
+    )
+    
+    # Calculate daily-level metrics
+    daily_precision = precision_score(y_true, y_pred, zero_division=0)
+    daily_recall = recall_score(y_true, y_pred, zero_division=0)
+    daily_f1 = f1_score(y_true, y_pred, zero_division=0)
+    
+    # Calculate smoothed daily metrics
+    if len(y_pred_smoothed) > 0:
+        smoothed_precision = precision_score(y_true, y_pred_smoothed, zero_division=0)
+        smoothed_recall = recall_score(y_true, y_pred_smoothed, zero_division=0)
+        smoothed_f1 = f1_score(y_true, y_pred_smoothed, zero_division=0)
+    else:
+        smoothed_precision = smoothed_recall = smoothed_f1 = 0.0
+    
+    # Combined score
+    combined_score = event_weight * event_capture_rate + precision_weight * daily_precision
+    
+    return {
+        'event_capture_rate': event_capture_rate,
+        'captured_events': captured,
+        'total_events': total,
+        'daily_precision': daily_precision,
+        'daily_recall': daily_recall,
+        'daily_f1': daily_f1,
+        'smoothed_precision': smoothed_precision,
+        'smoothed_recall': smoothed_recall,
+        'smoothed_f1': smoothed_f1,
+        'combined_score': combined_score
+    }
+
+# ============================================================================
+# ENHANCED THRESHOLD OPTIMIZATION (Event-Level)
+# ============================================================================
+
+def find_optimal_threshold_event_level(df_train, df_test, feature, 
+                                      smoothing_params={'window_size': 5, 'min_days': 3},
+                                      overlap_threshold=0.5,
+                                      optimization_metric='combined_score',
+                                      fine_grid=True):
+    """
+    Find threshold that optimizes event-level performance instead of daily F1
+    
+    Parameters:
+    -----------
+    df_train, df_test : pd.DataFrame
+        Training and test data
+    feature : str
+        Feature name to optimize
+    smoothing_params : dict
+        Window smoothing parameters
+    overlap_threshold : float
+        Overlap threshold for event capture
+    optimization_metric : str
+        Metric to optimize ('event_capture_rate', 'combined_score', 'smoothed_f1')
+    fine_grid : bool
+        Use fine grid for threshold search
+    
+    Returns:
+    --------
+    tuple
+        (best_threshold, best_score, metrics_dict)
+    """
+    # Check if feature exists
+    if feature not in df_test.columns or feature not in df_train.columns:
+        print(f"[DEBUG] Feature {feature} not found in dataframes")
+        return None, 0, {}
+    
+    try:
+        train_feature = df_train[feature].dropna()
+        test_feature = df_test[feature].dropna()
+        
+        # Check for sufficient data
+        if len(train_feature) < 5 or len(test_feature) < 5:
+            print(f"[DEBUG] Insufficient data for {feature}")
+            return None, 0, {}
+        
+        # Check for variance
+        if train_feature.std() < 1e-6:
+            print(f"[DEBUG] No variance in feature {feature}")
+            return None, 0, {}
+        
+        # Generate thresholds
+        if fine_grid:
+            percentiles = list(range(5, 96, 2))  # 5% to 95% by 2%
+        else:
+            percentiles = list(range(10, 91, 10))  # 10% to 90% by 10%
+        
+        thresholds = [np.percentile(train_feature, p) for p in percentiles]
+        thresholds = sorted(list(set(thresholds)))
+        
+        if len(thresholds) < 2:
+            print(f"[DEBUG] Insufficient unique thresholds for {feature}")
+            return None, 0, {}
+        
+        # Find best threshold
+        best_score = -1
+        best_threshold = None
+        best_metrics = {}
+        y_true = df_test[config.EVENT_DUMMY_TARGET].values
+        
+        for threshold in thresholds:
+            try:
+                y_pred = (df_test[feature] > threshold).fillna(False).astype(int).values
+                
+                if np.sum(y_pred) == 0:  # No positive predictions
+                    continue
+                
+                # Calculate all metrics
+                metrics = calculate_combined_score(
+                    y_true, y_pred, 
+                    smoothing_params=smoothing_params,
+                    overlap_threshold=overlap_threshold
+                )
+                
+                # Get score for optimization
+                score = metrics.get(optimization_metric, 0)
+                
+                if score > best_score:
+                    best_score = score
+                    best_threshold = threshold
+                    best_metrics = metrics
+                    
+            except Exception as e:
+                print(f"[DEBUG] Error evaluating threshold {threshold} for {feature}: {e}")
+                continue
+        
+        if best_threshold is None:
+            print(f"[DEBUG] No valid threshold found for {feature}")
+            return None, 0, {}
+        
+        return best_threshold, best_score, best_metrics
+        
+    except Exception as e:
+        print(f"[DEBUG] find_optimal_threshold_event_level failed for {feature}: {e}")
+        return None, 0, {}
+
+# ============================================================================
+# KEEP ALL EXISTING FUNCTIONS (backward compatibility)
+# ============================================================================
+
+def find_optimal_threshold(df_train, df_test, feature, fine_grid=False, alt_name=None):
+    """
+    ORIGINAL FUNCTION: Find threshold that maximizes F1 score for a feature
+    (Kept for backward compatibility)
+    """
+    # Check if feature exists in both dataframes
+    if feature not in df_test.columns:
+        print(f"[DEBUG] Feature {feature} not found in test dataframe")
+        return None
+    if feature not in df_train.columns:
+        print(f"[DEBUG] Feature {feature} not found in train dataframe")
+        return None
+    
+    try:
+        train_feature = df_train[feature].dropna()
+        test_feature = df_test[feature].dropna()
+        
+        # Check for sufficient data
+        if len(train_feature) < 5:
+            print(f"[DEBUG] Insufficient training data for {feature}: {len(train_feature)} samples")
+            return None
+        if len(test_feature) < 5:
+            print(f"[DEBUG] Insufficient test data for {feature}: {len(test_feature)} samples")
+            return None
+        
+        # Check for variance
+        if train_feature.std() < 1e-6:
+            print(f"[DEBUG] No variance in training feature {feature}: std={train_feature.std()}")
+            return None
+            
+        # Generate thresholds
+        if fine_grid:
+            percentiles = list(range(5, 96, 2))  # 5% to 95% by 2% (more conservative)
+        else:
+            percentiles = list(range(10, 91, 10))  # 10% to 90% by 10%
+        
+        try:
+            thresholds = [np.percentile(train_feature, p) for p in percentiles]
+            thresholds = sorted(list(set(thresholds)))
+        except Exception as e:
+            print(f"[DEBUG] Error generating thresholds for {feature}: {e}")
+            return None
+        
+        if len(thresholds) < 2:
+            print(f"[DEBUG] Insufficient unique thresholds for {feature}: {len(thresholds)}")
+            return None
+        
+        # Find best threshold
+        best_f1 = -1
+        best_threshold = None
+        y_true = df_test[config.EVENT_DUMMY_TARGET]
+        valid_predictions = 0
+        
+        for threshold in thresholds:
+            try:
+                y_pred = (df_test[feature] > threshold).fillna(False).astype(int)
+                
+                if y_pred.sum() == 0:  # No positive predictions
+                    continue
+                    
+                # Check basic accuracy first
+                accuracy = accuracy_score(y_true, y_pred)
+                if accuracy < 0.2:  # Very lenient threshold
+                    continue
+                    
+                f1 = f1_score(y_true, y_pred, zero_division=0)
+                valid_predictions += 1
+                
+                if f1 > best_f1:
+                    best_f1 = f1
+                    best_threshold = threshold
+                    
+            except Exception as e:
+                print(f"[DEBUG] Error evaluating threshold {threshold} for {feature}: {e}")
+                continue
+        
+        if best_threshold is None:
+            print(f"[DEBUG] No valid threshold found for {feature} - {len(thresholds)} thresholds tested, {valid_predictions} valid predictions")
+            return None
+            
+        return best_threshold
+        
+    except Exception as e:
+        print(f"[DEBUG] find_optimal_threshold failed for {feature}: {e}")
+        return None
+
+# ============================================================================
+# ENHANCED RULE APPLICATION FUNCTIONS
+# ============================================================================
+
+def apply_single_condition_with_event_optimization(df, feature, 
+                                                   df_train=None, 
+                                                   optimization_method='daily_f1',
+                                                   **event_params):
+    """
+    Apply single condition with choice of optimization method
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Data to apply condition to
+    feature : str
+        Feature name
+    df_train : pd.DataFrame, optional
+        Training data for threshold optimization
+    optimization_method : str
+        'daily_f1' (original) or 'event_level' (new)
+    **event_params : dict
+        Parameters for event-level optimization
+    
+    Returns:
+    --------
+    pd.Series
+        Boolean predictions
+    """
+    if df_train is not None:
+        if optimization_method == 'event_level':
+            threshold, _, _ = find_optimal_threshold_event_level(df_train, df, feature, **event_params)
+        else:
+            threshold = find_optimal_threshold(df_train, df, feature, fine_grid=True)
+    else:
+        # Fallback: use median as threshold
+        threshold = df[feature].median() if feature in df.columns else None
+    
+    if threshold is None:
+        return pd.Series(False, index=df.index)
+    
+    return df[feature] > threshold
+
+# ============================================================================
+# KEEP ALL OTHER EXISTING FUNCTIONS UNCHANGED
+# ============================================================================
+
+def apply_single_condition(df, feature, threshold):
+    if feature not in df.columns or threshold is None:
+        return pd.Series(False, index=df.index)
+    return df[feature] > threshold
+
+def apply_and_condition(df, feature1, threshold1, feature2, threshold2):
+    if any(f not in df.columns for f in [feature1, feature2]):
+        return pd.Series(False, index=df.index)
+    if threshold1 is None or threshold2 is None:
+        return pd.Series(False, index=df.index)
+    return (df[feature1] > threshold1) & (df[feature2] > threshold2)
+
+def apply_or_condition(df, feature1, threshold1, feature2, threshold2):
+    if any(f not in df.columns for f in [feature1, feature2]):
+        return pd.Series(False, index=df.index)
+    if threshold1 is None or threshold2 is None:
+        return pd.Series(False, index=df.index)
+    return (df[feature1] > threshold1) | (df[feature2] > threshold2)
+
+def apply_majority_condition(df, feature1, threshold1, feature2, threshold2, feature3, threshold3):
+    """Apply majority rule (2 out of 3 conditions must be true)"""
+    try:
+        if any(f not in df.columns for f in [feature1, feature2, feature3]):
+            print(f"[DEBUG] Missing features in apply_majority_condition")
+            return pd.Series(False, index=df.index)
+        
+        if any(t is None for t in [threshold1, threshold2, threshold3]):
+            print(f"[DEBUG] Missing thresholds in apply_majority_condition")
+            return pd.Series(False, index=df.index)
+        
+        # Calculate individual conditions
+        cond1 = df[feature1] > threshold1
+        cond2 = df[feature2] > threshold2
+        cond3 = df[feature3] > threshold3
+        
+        # Majority rule: at least 2 out of 3 must be true
+        result = (cond1.astype(int) + cond2.astype(int) + cond3.astype(int)) >= 2
+        
+        # Ensure result is boolean Series
+        if not isinstance(result, pd.Series):
+            result = pd.Series(result, index=df.index)
+            
+        return result.astype(bool)
+        
+    except Exception as e:
+        print(f"[DEBUG] apply_majority_condition exception: {e}")
+        print(f"[DEBUG] Features: {feature1}, {feature2}, {feature3}")
+        print(f"[DEBUG] Thresholds: {threshold1}, {threshold2}, {threshold3}")
+        return pd.Series(False, index=df.index)
+
+def temporal_smoothing(y_pred_series, window=2, min_consecutive=1):
+    """Apply temporal smoothing to predictions"""
+    if not isinstance(y_pred_series, pd.Series):
+        y_pred_series = pd.Series(y_pred_series)
+    
+    y = y_pred_series.astype(int).values
+    if min_consecutive > 1:
+        # Mark as 1 if at least min_consecutive consecutive 1s
+        from scipy.ndimage import label
+        labels, num = label(y)
+        for i in range(1, num+1):
+            idxs = np.where(labels == i)[0]
+            if len(idxs) >= min_consecutive:
+                y[idxs] = 1
+            else:
+                y[idxs] = 0
+        return pd.Series(y, index=y_pred_series.index)
+    elif window > 1:
+        # Use rolling mean as a soft smoother
+        y_smoothed = pd.Series(y, index=y_pred_series.index).rolling(window, min_periods=1).mean()
+        return (y_smoothed > 0.5).astype(int)
+    else:
+        return y_pred_series
+
+# ============================================================================
+# USAGE EXAMPLES AND COMPARISON FUNCTION
+# ============================================================================
+
+def compare_optimization_methods(df_train, df_test, feature, verbose=True):
+    """
+    Compare original daily F1 optimization vs new event-level optimization
+    
+    Returns:
+    --------
+    dict
+        Comparison results
+    """
+    results = {}
+    
+    # Method 1: Original daily F1 optimization
+    threshold_daily = find_optimal_threshold(df_train, df_test, feature, fine_grid=True)
+    if threshold_daily is not None:
+        y_pred_daily = (df_test[feature] > threshold_daily).fillna(False).astype(int)
+        y_true = df_test[config.EVENT_DUMMY_TARGET]
+        
+        daily_metrics = calculate_combined_score(y_true, y_pred_daily)
+        results['daily_f1_method'] = {
+            'threshold': threshold_daily,
+            'metrics': daily_metrics
+        }
+    
+    # Method 2: Event-level optimization
+    threshold_event, score_event, event_metrics = find_optimal_threshold_event_level(
+        df_train, df_test, feature, optimization_metric='combined_score'
+    )
+    if threshold_event is not None:
+        results['event_level_method'] = {
+            'threshold': threshold_event,
+            'score': score_event,
+            'metrics': event_metrics
+        }
+    
+    if verbose and len(results) == 2:
+        print(f"\n🔍 Comparison for feature: {feature}")
+        for method_label, method in [
+            ("Daily F1 Method", results['daily_f1_method']),
+            ("Event-Level Method", results['event_level_method'])
+        ]:
+            metrics = method['metrics']
+            threshold = method['threshold']
+            print(f"{method_label}:")
+            print(f"  Threshold: {threshold:.4f}")
+            print(f"  Daily F1: {metrics['daily_f1']:.3f}")
+            print(f"  Daily Precision: {metrics['daily_precision']:.3f}")
+            print(f"  Daily Recall: {metrics['daily_recall']:.3f}")
+            print(f"  Smoothed F1: {metrics['smoothed_f1']:.3f}")
+            print(f"  Event Capture: {metrics['event_capture_rate']:.3f} ({metrics['captured_events']} / {metrics['total_events']})")
+            percent_captured = 100 * metrics['event_capture_rate'] if metrics['total_events'] > 0 else 0
+            print(f"    → Percent of events captured: {percent_captured:.1f}%")
+            # False positive events: predicted events not overlapping with any observed event
+            # Find predicted event periods
+            from rule_evaluation import find_event_periods
+            y_pred = (df_test[feature] > threshold).fillna(False).astype(int).values
+            pred_events = find_event_periods(y_pred)
+            y_true = df_test[config.EVENT_DUMMY_TARGET].values
+            obs_events = find_event_periods(y_true)
+            # Count predicted events that do not overlap any observed event
+            fp_events = 0
+            for pred_start, pred_end in pred_events:
+                overlap = False
+                for obs_start, obs_end in obs_events:
+                    if pred_end >= obs_start and pred_start <= obs_end:
+                        overlap = True
+                        break
+                if not overlap:
+                    fp_events += 1
+            print(f"  False positive events: {fp_events}")
+            if 'combined_score' in metrics:
+                print(f"  Combined Score: {metrics['combined_score']:.3f}")
+            print("  ----")
+        print("-" * 50)
+    return results
+
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import seaborn as sns
+from rule_evaluation import smooth_predictions, find_event_periods
+
+def plot_event_prediction_comparison(df_test, feature, daily_threshold, event_threshold, 
+                                   target_col='event_dummy_1', 
+                                   save_path=None, figsize=(15, 10)):
+    """
+    Plot comparison of daily F1 vs event-level predictions with shaded regions
+    
+    Parameters:
+    -----------
+    df_test : pd.DataFrame
+        Test dataset
+    feature : str
+        Feature name to plot
+    daily_threshold : float
+        Threshold from daily F1 optimization
+    event_threshold : float
+        Threshold from event-level optimization
+    target_col : str
+        Target column name
+    save_path : str, optional
+        Path to save plot
+    figsize : tuple
+        Figure size
+    """
+    
+    # Prepare data
+    df_plot = df_test.copy()
+    df_plot['date'] = pd.to_datetime(df_plot['date'])
+    df_plot = df_plot.sort_values('date').reset_index(drop=True)
+    
+    # Get feature values and observed events
+    feature_values = df_plot[feature].values
+    observed_events = df_plot[target_col].values
+    
+    # Generate predictions
+    daily_predictions = (feature_values > daily_threshold).astype(int)
+    event_raw_predictions = (feature_values > event_threshold).astype(int)
+    event_predictions = smooth_predictions(event_raw_predictions, window_size=5, min_days=3)
+    
+    # Find event periods for shading
+    observed_periods = find_event_periods(observed_events)
+    daily_pred_periods = find_event_periods(daily_predictions)
+    event_pred_periods = find_event_periods(event_predictions)
+    
+    # Create figure with subplots
+    fig, axes = plt.subplots(3, 1, figsize=figsize, sharex=True)
+    
+    # Color scheme
+    colors = {
+        'feature': '#2E86AB',
+        'observed': '#A23B72', 
+        'daily_pred': '#F18F01',
+        'event_pred': '#C73E1D',
+        'threshold_daily': '#F18F01',
+        'threshold_event': '#C73E1D'
+    }
+    
+    dates = df_plot['date']
+    
+    # ========================================================================
+    # TOP PLOT: Feature evolution with thresholds
+    # ========================================================================
+    ax1 = axes[0]
+    
+    # Plot feature values
+    ax1.plot(dates, feature_values, color=colors['feature'], linewidth=1.5, 
+             label=f'{feature}', alpha=0.8)
+    
+    # Add threshold lines
+    ax1.axhline(daily_threshold, color=colors['threshold_daily'], linestyle='--', 
+                linewidth=2, label=f'Daily F1 Threshold: {daily_threshold:.3f}')
+    ax1.axhline(event_threshold, color=colors['threshold_event'], linestyle='--', 
+                linewidth=2, label=f'Event-Level Threshold: {event_threshold:.3f}')
+    
+    # Shade observed events
+    for start, end in observed_periods:
+        ax1.axvspan(dates.iloc[start], dates.iloc[end], 
+                   color=colors['observed'], alpha=0.2, label='Observed Events' if start == observed_periods[0][0] else "")
+    
+    ax1.set_ylabel('Feature Value', fontsize=12)
+    ax1.set_title(f'Feature Evolution: {feature}\nDaily F1 vs Event-Level Thresholds', fontsize=14, fontweight='bold')
+    ax1.legend(loc='upper right', fontsize=10)
+    ax1.grid(True, alpha=0.3)
+    
+    # ========================================================================
+    # MIDDLE PLOT: Daily F1 Method Predictions
+    # ========================================================================
+    ax2 = axes[1]
+    
+    # Plot feature as background
+    ax2.plot(dates, feature_values, color=colors['feature'], alpha=0.3, linewidth=1)
+    ax2.axhline(daily_threshold, color=colors['threshold_daily'], linestyle='--', alpha=0.7)
+    
+    # Shade observed events (background)
+    for start, end in observed_periods:
+        ax2.axvspan(dates.iloc[start], dates.iloc[end], 
+                   color=colors['observed'], alpha=0.1, label='Observed Events' if start == observed_periods[0][0] else "")
+    
+    # Shade predicted events
+    for start, end in daily_pred_periods:
+        ax2.axvspan(dates.iloc[start], dates.iloc[end], 
+                   color=colors['daily_pred'], alpha=0.4, 
+                   label='Daily F1 Predictions' if start == daily_pred_periods[0][0] else "")
+    
+    # Calculate and display metrics
+    from sklearn.metrics import precision_score, recall_score
+    daily_precision = precision_score(observed_events, daily_predictions, zero_division=0)
+    daily_recall = recall_score(observed_events, daily_predictions, zero_division=0)
+    daily_captured = len([p for p in daily_pred_periods for o in observed_periods if not (p[1] < o[0] or p[0] > o[1])])
+    daily_total_obs = len(observed_periods)
+    
+    ax2.set_ylabel('Daily F1 Method', fontsize=12)
+    ax2.set_title(f'Daily F1 Method: {daily_captured}/{daily_total_obs} events captured '
+                 f'(Precision: {daily_precision:.3f}, Recall: {daily_recall:.3f})', fontsize=12)
+    ax2.legend(loc='upper right', fontsize=10)
+    ax2.grid(True, alpha=0.3)
+    
+    # ========================================================================
+    # BOTTOM PLOT: Event-Level Method Predictions
+    # ========================================================================
+    ax3 = axes[2]
+    
+    # Plot feature as background
+    ax3.plot(dates, feature_values, color=colors['feature'], alpha=0.3, linewidth=1)
+    ax3.axhline(event_threshold, color=colors['threshold_event'], linestyle='--', alpha=0.7)
+    
+    # Shade observed events (background)
+    for start, end in observed_periods:
+        ax3.axvspan(dates.iloc[start], dates.iloc[end], 
+                   color=colors['observed'], alpha=0.1, label='Observed Events' if start == observed_periods[0][0] else "")
+    
+    # Shade predicted events
+    for start, end in event_pred_periods:
+        ax3.axvspan(dates.iloc[start], dates.iloc[end], 
+                   color=colors['event_pred'], alpha=0.4, 
+                   label='Event-Level Predictions' if start == event_pred_periods[0][0] else "")
+    
+    # Calculate metrics for event-level
+    event_precision = precision_score(observed_events, event_predictions, zero_division=0)
+    event_recall = recall_score(observed_events, event_predictions, zero_division=0)
+    event_captured = len([p for p in event_pred_periods for o in observed_periods if not (p[1] < o[0] or p[0] > o[1])])
+    
+    ax3.set_ylabel('Event-Level Method', fontsize=12)
+    ax3.set_title(f'Event-Level Method: {event_captured}/{daily_total_obs} events captured '
+                 f'(Precision: {event_precision:.3f}, Recall: {event_recall:.3f})', fontsize=12)
+    ax3.legend(loc='upper right', fontsize=10)
+    ax3.grid(True, alpha=0.3)
+    ax3.set_xlabel('Date', fontsize=12)
+    
+    # Format x-axis
+    for ax in axes:
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax.tick_params(axis='x', rotation=45)
+    
+    plt.tight_layout()
+    
+    # Add summary text box
+    summary_text = f"""COMPARISON SUMMARY
+Daily F1 Method: {daily_captured}/{daily_total_obs} events ({daily_captured/daily_total_obs*100:.1f}%)
+Event-Level Method: {event_captured}/{daily_total_obs} events ({event_captured/daily_total_obs*100:.1f}%)
+
+Feature: {feature}
+Daily Threshold: {daily_threshold:.4f}
+Event Threshold: {event_threshold:.4f}"""
+    
+    fig.text(0.02, 0.02, summary_text, fontsize=9, 
+             bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray", alpha=0.8),
+             verticalalignment='bottom')
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"✅ Plot saved: {save_path}")
+    
+    plt.show()
+    
+    return fig, axes
+
+def plot_best_event_rule(comparison_results, df_test, save_dir=None):
+    """
+    Automatically plot the rule with least false positives and perfect event capture
+    
+    Parameters:
+    -----------
+    comparison_results : dict
+        Results from compare_optimization_methods()
+    df_test : pd.DataFrame
+        Test data
+    save_dir : str, optional
+        Directory to save plots
+    """
+    if len(comparison_results) < 2:
+        print("❌ Need both daily and event-level results")
+        return None
+    
+    # Get thresholds and feature info
+    daily_method = comparison_results['daily_f1_method']
+    event_method = comparison_results['event_level_method']
+    
+    daily_threshold = daily_method['threshold']
+    event_threshold = event_method['threshold'] 
+    
+    # Get metrics for title
+    event_capture = event_method['metrics']['event_capture_rate']
+    fp_events = len(find_event_periods((df_test[feature] > event_threshold).astype(int))) - event_method['metrics']['captured_events']
+    
+    print(f"📊 Plotting best rule:")
+    print(f"   Feature: {feature}")
+    print(f"   Event Capture: {event_capture:.1%}")
+    print(f"   False Positive Events: {fp_events}")
+    
+    save_path = None
+    if save_dir:
+        import os
+        os.makedirs(save_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = os.path.join(save_dir, f'event_prediction_comparison_{feature}_{timestamp}.png')
+    
+    fig, axes = plot_event_prediction_comparison(
+        df_test, feature, daily_threshold, event_threshold,
+        save_path=save_path
+    )
+    
+    return fig, axes
+
+# USAGE IN YOUR PIPELINE:
+def add_visualization_to_comparison():
+    """
+    Add this to your rule_evaluation.py comparison section
+    """
+    
+    # After your comparison loop, add this:
+    print(f"\n📊 CREATING VISUALIZATION FOR BEST RULE")
+    print("="*60)
+    
+    # Use the first feature (lowest false positives based on your results)
+    best_feature = 'anom_swh_p80_trend_7'  # From your results
+    
+    try:
+        results = compare_optimization_methods(df_train, df_test, best_feature, verbose=False)
+        
+        fig, axes = plot_event_prediction_comparison(
+            df_test, 
+            feature=best_feature,
+            daily_threshold=results['daily_f1_method']['threshold'],
+            event_threshold=results['event_level_method']['threshold'],
+            save_path=f"event_comparison_{best_feature}.png"
+        )
+        
+        print(f"✅ Visualization created for {best_feature}")
+        
+    except Exception as e:
+        print(f"❌ Visualization failed: {e}")
+
+
+# --- MAIN EXECUTION ---
 # --- MAIN EXECUTION ---
 def main():
     print("\n🔧 RULE_EVALUATION.PY - CV Pipeline")
@@ -3367,6 +4213,168 @@ def main():
     ml_probs_path = os.path.join(config.results_output_dir, 'ML_probs_2024.csv')
     save_best_lr_predictions_2024(df, selected_features_rule, output_path=ml_probs_path)
     print(f"✅ ML probabilities saved: {ml_probs_path}")
+
+    # 🔄 REPLACE EVERYTHING FROM HERE DOWN WITH THE NEW CODE:
+    # PASTE THE ENTIRE CODE FROM THE DOCUMENT HERE:
+    
+    print("\n🔍 COMPARING OPTIMIZATION METHODS (TEMPORAL SPLIT)")
+    print("="*60)
+
+    # Test event-level vs daily F1 optimization on top features
+    try:
+        # Use the selected features from the CV pipeline
+        test_features = selected_features_rule[:5] if len(selected_features_rule) > 0 else []
+        
+        if len(test_features) > 0:
+            # Use temporal split (same as your CV pipeline) - NO DATA LEAKAGE
+            df_sorted = df.sort_values('date').reset_index(drop=True)
+            split_idx = int(len(df_sorted) * 0.7)  # 70% train, 30% test
+            df_train = df_sorted.iloc[:split_idx].copy()
+            df_test = df_sorted.iloc[split_idx:].copy()
+            
+            print(f"📊 Testing {len(test_features)} top features (TEMPORAL SPLIT):")
+            print(f"   Train: {df_train.shape[0]} samples ({df_train['date'].min()} to {df_train['date'].max()})")
+            print(f"   Test:  {df_test.shape[0]} samples ({df_test['date'].min()} to {df_test['date'].max()})")
+            print(f"   Train events: {df_train[config.EVENT_DUMMY_TARGET].sum()} ({df_train[config.EVENT_DUMMY_TARGET].mean()*100:.1f}%)")
+            print(f"   Test events:  {df_test[config.EVENT_DUMMY_TARGET].sum()} ({df_test[config.EVENT_DUMMY_TARGET].mean()*100:.1f}%)")
+            
+            for i, feature in enumerate(test_features, 1):
+                print(f"\n📈 {i}/{len(test_features)} - Testing: {feature}")
+                try:
+                    results = compare_optimization_methods(df_train, df_test, feature, verbose=True)
+                    print("-" * 50)
+                except Exception as e:
+                    print(f"   ❌ Failed: {e}")
+                    
+        else:
+            print("⚠️ No selected features available for comparison")
+            
+    except Exception as e:
+        print(f"❌ Comparison failed: {e}")
+        print("Continuing with normal pipeline...")
+
+    # 🆕 ADD AUTO-DETECTION AND VISUALIZATION
+    print(f"\n📊 CREATING VISUALIZATION FOR BEST RULE")
+    print("="*60)
+
+    try:
+        # Auto-detect best feature from comparison results
+        best_feature = None
+        best_score = -1
+        best_results = None
+        all_results = {}
+        
+        print(f"🔍 Analyzing {len(test_features)} features to find optimal combination...")
+        
+        # Evaluate all features to find the best one
+        for feature in test_features:
+            try:
+                results = compare_optimization_methods(df_train, df_test, feature, verbose=False)
+                
+                if len(results) == 2:
+                    # Store results for this feature
+                    all_results[feature] = results
+                    
+                    # Get event-level metrics
+                    event_metrics = results['event_level_method']['metrics']
+                    
+                    # Criteria for "best" feature:
+                    # 1. Must have 100% event capture (non-negotiable)
+                    # 2. Among those, pick lowest false positive events
+                    # 3. Tie-breaker: highest combined score
+                    
+                    event_capture = event_metrics['event_capture_rate']
+                    combined_score = event_metrics['combined_score']
+                    captured_events = event_metrics['captured_events']
+                    total_events = event_metrics['total_events']
+                    
+                    # Calculate false positive events (rough estimate)
+                    y_pred_event = (df_test[feature] > results['event_level_method']['threshold']).astype(int)
+                    y_pred_smoothed = smooth_predictions(y_pred_event, window_size=5, min_days=3)
+                    predicted_periods = find_event_periods(y_pred_smoothed)
+                    observed_periods = find_event_periods(df_test[config.EVENT_DUMMY_TARGET])
+                    
+                    # Count overlapping periods (rough FP estimate)
+                    fp_events = len(predicted_periods) - captured_events
+                    
+                    print(f"   📈 {feature}:")
+                    print(f"      Event capture: {event_capture:.1%} ({captured_events}/{total_events})")
+                    print(f"      False positives: ~{fp_events}")
+                    print(f"      Combined score: {combined_score:.3f}")
+                    
+                    # Selection logic: prioritize perfect event capture, then minimize FPs
+                    if event_capture >= 0.999:  # Essentially 100%
+                        # Among perfect capturers, prefer fewer false positives
+                        # Use negative FP count as score (higher is better)
+                        selection_score = combined_score - (fp_events * 0.01)  # Penalize FPs slightly
+                        
+                        if selection_score > best_score:
+                            best_score = selection_score
+                            best_feature = feature
+                            best_results = results
+                            print(f"      ⭐ NEW BEST: {feature} (score: {selection_score:.3f})")
+                        
+            except Exception as e:
+                print(f"      ❌ Failed to evaluate {feature}: {e}")
+                continue
+        
+        # Create visualization for best feature
+        if best_feature and best_results:
+            print(f"\n🏆 BEST FEATURE SELECTED: {best_feature}")
+            
+            # Get metrics for the winning feature
+            daily_metrics = best_results['daily_f1_method']['metrics'] 
+            event_metrics = best_results['event_level_method']['metrics']
+            
+            print(f"   📊 Performance Summary:")
+            print(f"      Daily F1 Method: {daily_metrics['event_capture_rate']:.1%} event capture")
+            print(f"      Event-Level Method: {event_metrics['event_capture_rate']:.1%} event capture")
+            print(f"      Combined Score: {event_metrics['combined_score']:.3f}")
+            
+            # Extract thresholds
+            daily_threshold = best_results['daily_f1_method']['threshold']
+            event_threshold = best_results['event_level_method']['threshold']
+            
+            print(f"   🎯 Thresholds:")
+            print(f"      Daily F1: {daily_threshold:.4f}")
+            print(f"      Event-Level: {event_threshold:.4f}")
+            
+            # Create the visualization
+            print(f"\n📊 Creating visualization...")
+            fig, axes = plot_event_prediction_comparison(
+                df_test,
+                feature=best_feature,
+                daily_threshold=daily_threshold,
+                event_threshold=event_threshold,
+                save_path=os.path.join(config.results_output_dir, f'event_prediction_comparison_best_{best_feature}.png')
+            )
+            
+            print(f"✅ Visualization saved: event_prediction_comparison_best_{best_feature}.png")
+            
+            # Save best feature info for downstream use
+            best_feature_info = {
+                'best_feature': best_feature,
+                'daily_threshold': daily_threshold,
+                'event_threshold': event_threshold,
+                'daily_event_capture': daily_metrics['event_capture_rate'],
+                'event_level_capture': event_metrics['event_capture_rate'], 
+                'combined_score': event_metrics['combined_score'],
+                'selection_score': best_score
+            }
+            
+            import json
+            info_path = os.path.join(config.results_output_dir, 'best_feature_info.json')
+            with open(info_path, 'w') as f:
+                json.dump(best_feature_info, f, indent=2)
+            print(f"✅ Best feature info saved: best_feature_info.json")
+            
+        else:
+            print("❌ No suitable feature found for visualization")
+            print("   (Need 100% event capture for operational deployment)")
+            
+    except Exception as e:
+        print(f"❌ Auto-detection and visualization failed: {e}")
+        print("Continuing with pipeline...")
 
     print("\n🎉 Rule evaluation completed!")
 

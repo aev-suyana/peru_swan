@@ -389,12 +389,47 @@ def process_waverys_data(df_waverys_hourly, closed_ports):
             event_dates_df, on=['port_name', 'date'], how='left'
         )
     
-    df_waverys_daily['event_dummy_1'] = df_waverys_daily['event_dummy_1'].fillna(0).astype(int)
+    # Create event_dummy_1 as before
+    if event_dates:
+        event_dates_df = pd.DataFrame(event_dates)
+        df_waverys_daily['date'] = pd.to_datetime(df_waverys_daily['date'])
+        event_dates_df['date'] = pd.to_datetime(event_dates_df['date'])
+        df_waverys_daily['date'] = df_waverys_daily['date'].dt.date
+        event_dates_df['date'] = event_dates_df['date'].dt.date
+        # Merge back to main data for event_dummy_1
+        df_waverys_daily = df_waverys_daily.merge(
+            event_dates_df[['port_name', 'date']], on=['port_name', 'date'], how='left'
+        )
+        df_waverys_daily['event_dummy_1'] = df_waverys_daily['event_dummy_1'].fillna(0).astype(int) if 'event_dummy_1' in df_waverys_daily.columns else 0
+        df_waverys_daily['event_dummy_1'] = 1 * df_waverys_daily[['port_name', 'date']].isin(event_dates_df[['port_name', 'date']].to_dict(orient='list')).all(axis=1)
+        df_waverys_daily['event_dummy_1'] = df_waverys_daily['event_dummy_1'].astype(int)
+
+    # Now create event_dummy_N for N=2..7 based on event period durations
+    if 'event_dummy_1' in df_waverys_daily.columns:
+        # Identify consecutive event periods
+        is_event = df_waverys_daily['event_dummy_1'] == 1
+        group_id = (is_event != is_event.shift()).cumsum()
+        df_waverys_daily['event_group'] = group_id.where(is_event, np.nan)
+        # Compute duration for each event group
+        event_durations = df_waverys_daily.groupby('event_group').size()
+        df_waverys_daily['event_duration'] = df_waverys_daily['event_group'].map(event_durations)
+        # For N=2..7, mark only days in event periods of at least N days
+        for n in range(2, 8):
+            colname = f'event_dummy_{n}'
+            df_waverys_daily[colname] = np.where((df_waverys_daily['event_dummy_1'] == 1) & (df_waverys_daily['event_duration'] >= n), 1, 0)
+        df_waverys_daily.drop(columns=['event_group', 'event_duration'], inplace=True)
+
     
     # Print event statistics
     event_count = sum(df_waverys_daily['event_dummy_1'] == 1)
-    print(f"Total rows marked as events: {event_count}")
-    print(f"Percentage of rows marked as events: {event_count/len(df_waverys_daily)*100:.2f}%")
+    print(f"Total rows marked as 1-day events: {event_count}")
+    print(f"Percentage of rows marked as 1-day events: {event_count/len(df_waverys_daily)*100:.2f}%")
+    # Print for N-day events
+    for n in range(2, 8):
+        colname = f'event_dummy_{n}'
+        n_count = sum(df_waverys_daily[colname] == 1)
+        print(f"Total rows marked as {n}-day events: {n_count}")
+        print(f"Percentage of rows marked as {n}-day events: {n_count/len(df_waverys_daily)*100:.2f}%")
     
     print(f"✅ WAVERYS daily processing complete: {df_waverys_daily.shape}")
     

@@ -90,7 +90,7 @@ def detrend_and_deseasonalize_reference_point(df_daily, apply_detrending=True, a
     df_processed = df_daily.copy()
     df_processed['date'] = pd.to_datetime(df_processed['date'])
     df_processed = df_processed.sort_values('date').reset_index(drop=True)
-    wave_features = [col for col in df_daily.columns if any(wave_type in col for wave_type in ['swh', 'swe']) and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+    wave_features = [col for col in df_daily.columns if any(wave_type in col for wave_type in ['swh', 'swe']) and not col.startswith('event_dummy') and col not in ['date', 'total_obs_sw', 'port_name', 'year']]
     print(f"Processing {len(wave_features)} wave features...")
     print(f"Example features: {wave_features[:5]}")
     if len(df_processed) < 30:
@@ -155,7 +155,7 @@ def create_enhanced_features_reference_point(df_processed, use_processed_feature
                           if (col.startswith('pct_') or 
                               (any(wave_type in col for wave_type in ['swh', 'swe']) 
                                and not col.endswith(('_processed', '_raw'))))
-                          and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+                          and not col.startswith('event_dummy') and col not in ['date', 'total_obs_sw', 'port_name', 'year']]
     base_features.extend(additional_features)
     base_features = list(set(base_features))  # Remove duplicates
     print(f"Creating enhanced features from {len(base_features)} {feature_type} features...")
@@ -218,7 +218,22 @@ def create_enhanced_features_reference_point(df_processed, use_processed_feature
             df_enhanced[rel_change_col] = np.where(past_values != 0,
                                                   ((df_enhanced[feature] - past_values) / past_values) * 100,
                                                   0)
+    # 3d: Moving averages, min, and max features
+    print("  Creating moving average, min, and max features...")
+    MA_WINDOWS = [2, 3, 5, 7]
+    ma_min_max_features = []
+    for window in MA_WINDOWS:
+        for feature in valid_base_features:
+            ma_col = f'ma_{feature}_{window}'
+            mmin_col = f'mmin_{feature}_{window}'
+            mmaxi_col = f'mmaxi_{feature}_{window}'
+            df_enhanced[ma_col] = df_enhanced[feature].rolling(window, min_periods=1).mean()
+            df_enhanced[mmin_col] = df_enhanced[feature].rolling(window, min_periods=1).min()
+            df_enhanced[mmaxi_col] = df_enhanced[feature].rolling(window, min_periods=1).max()
+            ma_min_max_features.extend([ma_col, mmin_col, mmaxi_col])
         gc.collect()
+    # Add these new features to the list for further processing
+    valid_base_features.extend(ma_min_max_features)
     # 3d: Memory-efficient lag features
     print("  Creating lag features (memory-efficient)...")
     all_features_to_lag = valid_base_features.copy()
@@ -285,6 +300,13 @@ def main():
     df_swan_features['port_name'] = reference_port
     merged = pd.merge(df_swan_features, df_waverys_daily, on=['date', 'port_name'], suffixes=('_swan', '_waverys'), how='inner')
     print(f"Merged dataset shape: {merged.shape}")
+    # Print event_dummy_N stats if present
+    event_cols = [col for col in merged.columns if col.startswith('event_dummy_')]
+    total_samples = merged.shape[0]
+    for col in sorted(event_cols):
+        n_events = merged[col].sum()
+        pct = 100 * n_events / total_samples if total_samples > 0 else 0
+        print(f"{col}: {n_events} events ({pct:.1f}%)")
     # Step 5: Save outputs
     swan_features_path = os.path.join(output_dir, 'df_swan_daily_features.csv')
     merged_path = os.path.join(output_dir, 'df_swan_waverys_merged.csv')

@@ -19,8 +19,11 @@ import importlib.util
 # # Allow overriding RUN_PATH from environment variable
 RUN_PATH = os.environ.get('RUN_PATH', 'run_g10')  # fallback to default if not set
 MIN_DAYS = int(os.environ.get('MIN_DAYS', 1))  # ensure integer type
+EVENT_DUMMY_TARGET = os.environ.get('EVENT_DUMMY_TARGET', 'event_dummy_1')
 
 class Config:
+    # Specify which event_dummy column is the prediction target
+    EVENT_DUMMY_TARGET = os.environ.get('EVENT_DUMMY_TARGET', 'event_dummy_1')
     # AEP pipeline parameters
     MIN_DAYS = MIN_DAYS
     N_SIMULATIONS = 4000

@@ -1,0 +1,17 @@
+# Interactive Plotting Dependencies
+# For the interactive observed loss distribution analysis
+
+# Core data science libraries
+pandas>=1.3.0
+numpy>=1.21.0
+
+# Interactive plotting
+plotly>=5.0.0
+
+# Optional: For enhanced interactive features
+kaleido>=0.2.1  # For static image export from Plotly
+psutil>=5.8.0   # For system monitoring during large plots
+
+# Development and testing
+jupyter>=1.0.0
+ipykernel>=6.0.0 

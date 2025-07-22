@@ -1,0 +1,2 @@
+run_path,port_name,analysis_date,n_years,total_loss,mean_loss,median_loss,std_loss,min_loss,max_loss,p25_loss,p75_loss,p90_loss,p95_loss,p99_loss,zero_years,high_loss_years,extreme_loss_years,mean_loss_per_year,cv_loss
+run_g4,PUERTO_ETEN,20250721_125742,7,28723200.0,4103314.285714286,4936800.0,2358050.898113787,1271600.0,6956400.0,1907400.0,5871800.0,6597360.0,6776880.0,6920496.0,0,2,1,4103314.285714286,0.5746698239331449

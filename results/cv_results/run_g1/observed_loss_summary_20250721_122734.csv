@@ -1,0 +1,2 @@
+run_path,port_name,analysis_date,n_years,total_loss,mean_loss,median_loss,std_loss,min_loss,max_loss,p25_loss,p75_loss,p90_loss,p95_loss,p99_loss,zero_years,high_loss_years,extreme_loss_years,mean_loss_per_year,cv_loss
+run_g1,CALETA_GRAU,20250721_122734,7,439190.0,62741.42857142857,47480.0,52063.307433857684,0.0,166180.0,41545.0,71220.0,116326.00000000003,141252.99999999994,161194.59999999995,1,2,1,62741.42857142857,0.8298074911473481

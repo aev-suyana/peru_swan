@@ -136,7 +136,9 @@ def extract_complete_ml_metrics_fixed_events(run_dir):
         'mean_loss': np.nan, 'p99_loss': np.nan, 'mean_events': np.nan, 'p99_events': np.nan,
         'obs_mean_events': np.nan, 'obs_mean_loss': np.nan,
         'mean_fp': np.nan, 'p99_fp': np.nan, 'mean_tp': np.nan, 'p99_tp': np.nan, 
-        'mean_fn': np.nan, 'p99_fn': np.nan
+        'mean_fn': np.nan, 'p99_fn': np.nan,
+        'mean_tp_cost': np.nan, 'mean_fp_cost': np.nan, 'mean_fn_cost': np.nan,
+        'p99_tp_cost': np.nan, 'p99_fp_cost': np.nan, 'p99_fn_cost': np.nan
     }
     
     run_name = os.path.basename(run_dir)
@@ -144,14 +146,22 @@ def extract_complete_ml_metrics_fixed_events(run_dir):
     
     # Look for ML AEP summary files - prioritize enhanced/corrected versions
     ml_summary_files = []
-    ml_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'enhanced_ml_aep_summary_*.csv'))))
-    ml_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'corrected_ml_aep_summary_*.csv'))))
-    ml_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'ml_aep_summary_*.csv'))))
+    # First priority: enhanced ML files (these have event columns)
+    enhanced_files = sorted(glob.glob(os.path.join(run_dir, 'enhanced_ml_aep_summary_*.csv')))
+    if enhanced_files:
+        ml_summary_files.extend(enhanced_files)
+        print(f"      🎯 Found {len(enhanced_files)} enhanced ML files with event data")
+    else:
+        # Fallback to other versions
+        ml_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'corrected_ml_aep_summary_*.csv'))))
+        ml_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'ml_aep_summary_*.csv'))))
+        print(f"      ⚠️  No enhanced ML files found, using fallback files")
     
     if ml_summary_files:
         try:
             ml_summary_path = ml_summary_files[-1]  # Use latest
             print(f"      📄 Reading ML summary: {os.path.basename(ml_summary_path)}")
+            print(f"      📁 Full path: {ml_summary_path}")
             
             ml_summary = pd.read_csv(ml_summary_path)
             if len(ml_summary) > 0:
@@ -207,18 +217,36 @@ def extract_complete_ml_metrics_fixed_events(run_dir):
                 
                 # Confusion matrix metrics
                 cm_mapping = {
-                    'mean_fp': ['mean_fp', 'mean_fp_cost', 'avg_fp', 'fp_mean'],
-                    'mean_tp': ['mean_tp', 'mean_tp_cost', 'avg_tp', 'tp_mean'], 
-                    'mean_fn': ['mean_fn', 'mean_fn_cost', 'avg_fn', 'fn_mean'],
-                    'p99_fp': ['p99_fp', 'p99_fp_cost', 'fp_p99'],
-                    'p99_tp': ['p99_tp', 'p99_tp_cost', 'tp_p99'],
-                    'p99_fn': ['p99_fn', 'p99_fn_cost', 'fn_p99']
+                    'mean_fp': ['mean_fp', 'avg_fp', 'fp_mean'],
+                    'mean_tp': ['mean_tp', 'avg_tp', 'tp_mean'], 
+                    'mean_fn': ['mean_fn', 'avg_fn', 'fn_mean'],
+                    'p99_fp': ['p99_fp', 'fp_p99'],
+                    'p99_tp': ['p99_tp', 'tp_p99'],
+                    'p99_fn': ['p99_fn', 'fn_p99']
+                }
+                
+                # Cost metrics (separate from confusion matrix counts)
+                cost_mapping = {
+                    'mean_tp_cost': ['mean_tp_cost'],
+                    'mean_fp_cost': ['mean_fp_cost'],
+                    'mean_fn_cost': ['mean_fn_cost'],
+                    'p99_tp_cost': ['p99_tp_cost'],
+                    'p99_fp_cost': ['p99_fp_cost'],
+                    'p99_fn_cost': ['p99_fn_cost']
                 }
                 
                 for metric, possible_cols in cm_mapping.items():
                     for col in possible_cols:
                         if col in row and not pd.isna(row[col]):
                             metrics[metric] = float(row[col])
+                            break
+                
+                # Extract cost metrics
+                for metric, possible_cols in cost_mapping.items():
+                    for col in possible_cols:
+                        if col in row and not pd.isna(row[col]):
+                            metrics[metric] = float(row[col])
+                            print(f"      ✅ Found {metric}: ${metrics[metric]:,.0f}")
                             break
                 
                 print(f"      ✅ Final extracted: mean_loss=${metrics['mean_loss']:,.0f}, mean_events={metrics['mean_events']:.1f}")
@@ -285,7 +313,9 @@ def extract_complete_multi_condition_metrics_fixed_events(run_dir):
         'mean_loss': np.nan, 'p99_loss': np.nan, 'mean_events': np.nan, 'p99_events': np.nan,
         'obs_mean_events': np.nan, 'obs_mean_loss': np.nan,
         'mean_fp': np.nan, 'p99_fp': np.nan, 'mean_tp': np.nan, 'p99_tp': np.nan, 
-        'mean_fn': np.nan, 'p99_fn': np.nan
+        'mean_fn': np.nan, 'p99_fn': np.nan,
+        'mean_tp_cost': np.nan, 'mean_fp_cost': np.nan, 'mean_fn_cost': np.nan,
+        'p99_tp_cost': np.nan, 'p99_fp_cost': np.nan, 'p99_fn_cost': np.nan
     }
     
     run_name = os.path.basename(run_dir)
@@ -293,10 +323,22 @@ def extract_complete_multi_condition_metrics_fixed_events(run_dir):
     
     # Look for multi-condition AEP results - prioritize enhanced versions
     multi_summary_files = []
-    multi_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'enhanced_multi_rule_complete_summary_*.csv'))))
-    multi_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'enhanced_multi_rule_summary_*.csv'))))
-    multi_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'multi_rule_aep_summary_*.csv'))))
-    multi_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'fast_multi_rule_summary_*.csv'))))
+    # First priority: enhanced multi-rule complete summary files (these have event data)
+    enhanced_complete_files = sorted(glob.glob(os.path.join(run_dir, 'enhanced_multi_rule_complete_summary_*.csv')))
+    if enhanced_complete_files:
+        multi_summary_files.extend(enhanced_complete_files)
+        print(f"      🎯 Found {len(enhanced_complete_files)} enhanced multi-rule complete summary files with event data")
+    else:
+        # Second priority: enhanced multi-rule summary files
+        enhanced_files = sorted(glob.glob(os.path.join(run_dir, 'enhanced_multi_rule_summary_*.csv')))
+        if enhanced_files:
+            multi_summary_files.extend(enhanced_files)
+            print(f"      🎯 Found {len(enhanced_files)} enhanced multi-rule summary files with event data")
+        else:
+            # Fallback to other versions
+            multi_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'multi_rule_aep_summary_*.csv'))))
+            multi_summary_files.extend(sorted(glob.glob(os.path.join(run_dir, 'fast_multi_rule_summary_*.csv'))))
+            print(f"      ⚠️  No enhanced multi-rule files found, using fallback files")
     
     if multi_summary_files:
         try:
@@ -366,6 +408,13 @@ def extract_complete_multi_condition_metrics_fixed_events(run_dir):
                 for metric in cm_metrics:
                     if metric in best_rule:
                         metrics[metric] = best_rule[metric]
+                
+                # Cost metrics
+                cost_metrics = ['mean_tp_cost', 'mean_fp_cost', 'mean_fn_cost', 'p99_tp_cost', 'p99_fp_cost', 'p99_fn_cost']
+                for metric in cost_metrics:
+                    if metric in best_rule:
+                        metrics[metric] = best_rule[metric]
+                        print(f"      ✅ Found {metric}: ${metrics[metric]:,.0f}")
                 
                 print(f"      ✅ Final extracted: mean_loss=${metrics['mean_loss']:,.0f}, mean_events={metrics['mean_events']:.1f}")
                 
@@ -786,6 +835,65 @@ for idx, row in comparison_df.iterrows():
                             comparison_df.at[idx, 'obs_mean_events'] = comparison_df.at[idx, 'obs_mean_loss'] / event_cost
                 except Exception:
                     pass
+            
+            # Extract cost breakdown metrics from confusion matrix cost breakdown file
+            cost_files = sorted(glob.glob(os.path.join(run_dir_path, '*confusion_matrix_cost_breakdown*.csv')))
+            if cost_files:
+                try:
+                    cost_df = pd.read_csv(cost_files[-1])
+                    print(f"      📊 Reading cost breakdown: {os.path.basename(cost_files[-1])}")
+                    
+                    # Map cost breakdown to our metrics
+                    cost_mapping = {
+                        'False Positive (FP)': 'mean_fp_cost',
+                        'True Positive (TP)': 'mean_tp_cost', 
+                        'False Negative (FN)': 'mean_fn_cost'
+                    }
+                    
+                    for component, metric in cost_mapping.items():
+                        if component in cost_df['Component'].values:
+                            cost_value = cost_df[cost_df['Component'] == component]['Annual_Cost'].iloc[0]
+                            comparison_df.at[idx, metric] = cost_value
+                            print(f"      ✅ Found {metric}: ${cost_value:,.0f}")
+                    
+                    # For p99 costs, we'll use the same values as mean (approximation)
+                    for metric in ['mean_tp_cost', 'mean_fp_cost', 'mean_fn_cost']:
+                        if metric in comparison_df.columns and not pd.isna(comparison_df.at[idx, metric]):
+                            p99_metric = metric.replace('mean_', 'p99_')
+                            comparison_df.at[idx, p99_metric] = comparison_df.at[idx, metric] * 1.5  # Rough p99 estimate
+                            print(f"      ⚠️  Estimated {p99_metric}: ${comparison_df.at[idx, p99_metric]:,.0f}")
+                            
+                except Exception as e:
+                    print(f"      ❌ Error reading cost breakdown: {e}")
+            
+            # If no confusion matrix cost breakdown found, try multi-threshold summary files
+            if pd.isna(comparison_df.at[idx, 'mean_tp_cost']):
+                multi_threshold_files = sorted(glob.glob(os.path.join(run_dir_path, '*multi_threshold_full_summary*.csv')))
+                if multi_threshold_files:
+                    try:
+                        multi_df = pd.read_csv(multi_threshold_files[-1])
+                        print(f"      📊 Reading multi-threshold summary: {os.path.basename(multi_threshold_files[-1])}")
+                        
+                        # Get the best performing threshold (lowest mean_loss)
+                        best_row = multi_df.loc[multi_df['mean_loss'].idxmin()]
+                        
+                        # Extract cost metrics from multi-threshold summary
+                        cost_mapping = {
+                            'mean_tp_loss': 'mean_tp_cost',
+                            'mean_fp_loss': 'mean_fp_cost',
+                            'mean_fn_loss': 'mean_fn_cost',
+                            'p99_tp_loss': 'p99_tp_cost',
+                            'p99_fp_loss': 'p99_fp_cost',
+                            'p99_fn_loss': 'p99_fn_cost'
+                        }
+                        
+                        for source_col, target_col in cost_mapping.items():
+                            if source_col in best_row and not pd.isna(best_row[source_col]):
+                                comparison_df.at[idx, target_col] = best_row[source_col]
+                                print(f"      ✅ Found {target_col}: ${best_row[source_col]:,.0f}")
+                                
+                    except Exception as e:
+                        print(f"      ❌ Error reading multi-threshold summary: {e}")
                     
     elif method == 'Multi-Condition':
         # Enhanced Multi-Condition metrics extraction with FIXED event handling
@@ -821,7 +929,9 @@ metrics_cols = [
     'obs_precision', 'obs_recall', 'obs_accuracy', 'obs_f1',
     'mean_loss', 'p99_loss', 'mean_events', 'p99_events',
     'obs_mean_events', 'obs_mean_loss',
-    'mean_fp', 'p99_fp', 'mean_tp', 'p99_tp', 'mean_fn', 'p99_fn'
+    'mean_fp', 'p99_fp', 'mean_tp', 'p99_tp', 'mean_fn', 'p99_fn',
+    'mean_tp_cost', 'mean_fp_cost', 'mean_fn_cost',
+    'p99_tp_cost', 'p99_fp_cost', 'p99_fn_cost'
 ]
 
 # Create the individual metrics DataFrame
@@ -884,6 +994,13 @@ comparison_df['run_group'] = comparison_df['run_dir'].apply(extract_run_group)
 
 # Define metrics to aggregate
 agg_metrics = ['mean_loss', 'p99_loss', 'mean_events', 'p99_events', 'obs_mean_events', 'obs_mean_loss']
+
+# Add cost breakdown metrics
+cost_metrics = [
+    'mean_tp_cost', 'mean_fp_cost', 'mean_fn_cost',
+    'p99_tp_cost', 'p99_fp_cost', 'p99_fn_cost'
+]
+agg_metrics.extend(cost_metrics)
 
 # Create aggregated metrics by run group and method
 aggregated_data = []
@@ -958,7 +1075,12 @@ for col in numeric_cols:
     final_metrics_df[col] = final_metrics_df[col].round(2)
 
 print(f"\n=== FINAL AGGREGATED METRICS: FIXED Event Extraction by Run Group ===")
-display_cols = ['run_group', 'method', 'mean_loss_mean', 'p99_loss_mean', 'mean_events_mean', 'p99_events_mean', 'obs_f1_mean']
+display_cols = [
+    'run_group', 'method', 'mean_loss_mean', 'p99_loss_mean', 
+    'mean_events_mean', 'p99_events_mean', 'obs_f1_mean',
+    'mean_tp_cost_mean', 'mean_fp_cost_mean', 'mean_fn_cost_mean',
+    'p99_tp_cost_mean', 'p99_fp_cost_mean', 'p99_fn_cost_mean'
+]
 available_display_cols = [col for col in display_cols if col in final_metrics_df.columns]
 print(final_metrics_df[available_display_cols].to_string(index=False))
 

@@ -1,0 +1,2 @@
+mean_loss,std_loss,max_loss,zero_prob,method,block_length,window_days,trigger_feature,trigger_threshold,min_days,n_fishermen,daily_wage,n_simulations,n_jobs
+7914501.771404083,808568.0139611213,10565727.18367347,0.0,speed_optimized_block_bootstrap,4,10,calibrated_probability,0.31359999999999977,3,14424.0,11.269387755102041,4000,12

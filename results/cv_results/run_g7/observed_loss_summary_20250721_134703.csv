@@ -1,0 +1,2 @@
+run_path,port_name,analysis_date,n_years,total_loss,mean_loss,median_loss,std_loss,min_loss,max_loss,p25_loss,p75_loss,p90_loss,p95_loss,p99_loss,zero_years,high_loss_years,extreme_loss_years,mean_loss_per_year,cv_loss
+run_g7,CALETA_SAN_ANDRES,20250721_134703,7,922855.7142857143,131836.5306122449,108415.7142857143,85690.47892347265,23798.571428571428,259140.0,71395.71428571429,194355.0,227408.57142857148,243274.28571428568,255966.85714285713,0,2,1,131836.5306122449,0.6499752270901595

@@ -1775,6 +1775,7 @@ def calculate_fast_multi_rule_aep(df, rule_features, rule_operators, rule_logic_
         'mean_loss': float(np.mean(annual_losses)),
         'std_loss': float(np.std(annual_losses)),
         'max_loss': float(np.max(annual_losses)),
+        'p99_loss': float(np.percentile(annual_losses, 99)),
         'zero_prob': float(np.mean(annual_losses == 0)),
         'method': 'fast_multi_rule_bootstrap',
         'rule_features': rule_features,
@@ -1875,10 +1876,11 @@ def fast_multi_rule_main():
                     'f1_score': best_score,
                     'mean_loss': aep_results['summary']['mean_loss'],
                     'max_loss': aep_results['summary']['max_loss'],
+                    'p99_loss': aep_results['summary']['p99_loss'],
                     'zero_prob': aep_results['summary']['zero_prob']
                 }
                 results.append(result)
-                print(f"    ✅ Mean loss: ${result['mean_loss']:,.0f}")
+                print(f"    ✅ Mean loss: ${result['mean_loss']:,.0f}, P99 loss: ${result['p99_loss']:,.0f}")
             else:
                 print(f"    ❌ Failed")
                 
@@ -1897,7 +1899,7 @@ def fast_multi_rule_main():
         print("=" * 70)
         for i, (_, row) in enumerate(results_df.head(5).iterrows(), 1):
             print(f"{i}. {row['type']}: {row['description']}")
-            print(f"   F1: {row['f1_score']:.3f} | Mean Loss: ${row['mean_loss']:,.0f}")
+            print(f"   F1: {row['f1_score']:.3f} | Mean Loss: ${row['mean_loss']:,.0f} | P99 Loss: ${row['p99_loss']:,.0f}")
             print()
         
         print(f"✅ Results saved: {summary_path}")
@@ -3242,7 +3244,7 @@ def enhanced_multi_rule_main_keeping_working_parts():
                     **aep_results['summary']  # Include ALL the enhanced metrics
                 }
                 best_results.append(result)
-                print(f"    ✅ Mean loss: ${result['mean_loss']:,.0f}")
+                print(f"    ✅ Mean loss: ${result['mean_loss']:,.0f}, P99 loss: ${result['p99_loss']:,.0f}")
             else:
                 print(f"    ❌ Failed")
                 
@@ -3313,7 +3315,7 @@ def enhanced_multi_rule_main_keeping_working_parts():
         print("=" * 70)
         for i, (_, row) in enumerate(results_df.head(5).iterrows(), 1):
             print(f"{i}. {row['type']}: {row['description']}")
-            print(f"   F1: {row['f1_score']:.3f} | Mean Loss: ${row['mean_loss']:,.0f}")
+            print(f"   F1: {row['f1_score']:.3f} | Mean Loss: ${row['mean_loss']:,.0f} | P99 Loss: ${row['p99_loss']:,.0f}")
             print(f"   Events: {row['mean_events']:.1f} | Zero Prob: {row['zero_prob']:.1%}")
             print(f"   CM: TP={row['mean_tp']:.1f}, FP={row['mean_fp']:.1f}, FN={row['mean_fn']:.1f}")
             print()

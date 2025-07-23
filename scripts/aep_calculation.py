@@ -525,7 +525,11 @@ def calculate_unified_aep_analysis_fast(swh_data, trigger_feature, trigger_thres
             'fn_annual_costs': fn_annual_costs,
             'tp_annual_costs': tp_annual_costs,
             'insurance_annual_costs': insurance_annual_costs,
-            'summary': cm_summary
+            'summary': cm_summary,
+            'raw_fp_losses': fp_annual_costs,
+            'raw_fn_losses': fn_annual_costs,
+            'raw_tp_losses': tp_annual_costs,
+            'raw_insurance_losses': insurance_annual_costs
         }
     unified_results = {
         'standard_summary': standard_summary,

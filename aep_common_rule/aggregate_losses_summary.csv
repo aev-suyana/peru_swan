@@ -1,0 +1,9 @@
+metric,value
+observed_mean,20617148.57142857
+observed_p95,25995256.799999997
+observed_p99,26602798.56
+observed_max,26754684.0
+simulated_mean,17759800.450430047
+simulated_p95,24462228.0
+simulated_p99,27107109.359999996
+simulated_max,31231930.752000008

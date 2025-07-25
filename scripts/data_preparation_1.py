@@ -143,37 +143,55 @@ def create_enhanced_features_reference_point(df_processed, use_processed_feature
     df_enhanced['date'] = pd.to_datetime(df_enhanced['date'])
     df_enhanced = df_enhanced.sort_values('date').reset_index(drop=True)
     
-    # Choose features to enhance
-    if use_processed_features:
-        base_features = [col for col in df_enhanced.columns if col.endswith('_processed')]
-        feature_type = "processed"
-    else:
-        base_features = [col for col in df_enhanced.columns if col.endswith('_raw')]
-        feature_type = "raw"
-    # Also include pct_ columns and other base features
-    additional_features = [col for col in df_enhanced.columns 
-                          if (col.startswith('pct_') or 
-                              (any(wave_type in col for wave_type in ['swh', 'swe']) 
-                               and not col.endswith(('_processed', '_raw'))))
-                          and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
-    base_features.extend(additional_features)
+    # Choose features to enhance - focus on SWAN wave features
+    base_features = []
+    
+    # Include original SWAN features (swh_max, swh_mean, etc. - before merge, no _swan suffix yet)
+    swan_features = [col for col in df_enhanced.columns 
+                    if any(wave_type in col for wave_type in ['swh', 'swe']) 
+                    and not col.endswith(('_processed', '_raw', '_deseasonalized', '_detrended'))
+                    and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+    base_features.extend(swan_features)
+    
+    # Include processed features (deseasonalized, detrended)
+    processed_features = [col for col in df_enhanced.columns 
+                         if col.endswith(('_deseasonalized', '_detrended'))
+                         and any(wave_type in col for wave_type in ['swh', 'swe'])
+                         and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+    base_features.extend(processed_features)
+    
+    # Include percentage features
+    pct_features = [col for col in df_enhanced.columns 
+                   if col.startswith('pct_')
+                   and col not in ['date', 'event_dummy_1', 'total_obs_sw', 'port_name', 'year']]
+    base_features.extend(pct_features)
+    
     base_features = list(set(base_features))  # Remove duplicates
+    feature_type = "SWAN wave features"
     print(f"Creating enhanced features from {len(base_features)} {feature_type} features...")
     # Get valid features that exist in the dataframe
     valid_base_features = [f for f in base_features if f in df_enhanced.columns]
     if len(valid_base_features) == 0:
         print("No valid base features found!")
         return df_enhanced
-    # 3a: Memory-efficient persistence features
-    print("  Creating persistence features (memory-efficient)...")
+    # 3a: Memory-efficient moving average features (with correct naming)
+    print("  Creating moving average features (memory-efficient)...")
+    MA_WINDOWS = [2, 3, 5, 7, 14]
     PERSISTENCE_WINDOWS = [2, 3, 5, 7, 14]
     TREND_WINDOWS = [3, 5, 7, 14]
     CHANGE_WINDOWS = [3, 5, 7, 14]
     LAG_WINDOWS = [1, 3, 5, 7, 14]
-    for window in PERSISTENCE_WINDOWS:
+    
+    # Create moving averages with _ma_ naming convention
+    for window in MA_WINDOWS:
         for feature in valid_base_features:
-            col_name = f'{feature}_persistence_{window}'
-            df_enhanced[col_name] = df_enhanced[feature].rolling(window, min_periods=1).mean()
+            # Create moving average with _ma_ naming
+            ma_col_name = f'{feature}_ma_{window}'
+            df_enhanced[ma_col_name] = df_enhanced[feature].rolling(window, min_periods=1).mean()
+            
+            # Also create persistence features (for backward compatibility)
+            persistence_col_name = f'{feature}_persistence_{window}'
+            df_enhanced[persistence_col_name] = df_enhanced[feature].rolling(window, min_periods=1).mean()
     gc.collect()
     # 3b: Memory-efficient trend features
     print("  Creating trend features (memory-efficient)...")
@@ -223,15 +241,23 @@ def create_enhanced_features_reference_point(df_processed, use_processed_feature
     print("  Creating lag features (memory-efficient)...")
     all_features_to_lag = valid_base_features.copy()
     for feature in valid_base_features:
+        # Add moving average features
+        for window in MA_WINDOWS:
+            col_name = f'{feature}_ma_{window}'
+            if col_name in df_enhanced.columns:
+                all_features_to_lag.append(col_name)
+        # Add persistence features
         for window in PERSISTENCE_WINDOWS:
             col_name = f'{feature}_persistence_{window}'
             if col_name in df_enhanced.columns:
                 all_features_to_lag.append(col_name)
+        # Add trend features
         for window in TREND_WINDOWS:
             for suffix in ['_trend_', '_rolling_mean_']:
                 col_name = f'{feature}{suffix}{window}'
                 if col_name in df_enhanced.columns:
                     all_features_to_lag.append(col_name)
+        # Add change features
         for window in CHANGE_WINDOWS:
             for suffix in ['_abs_change_', '_rel_change_']:
                 col_name = f'{feature}{suffix}{window}'
@@ -257,6 +283,29 @@ def create_enhanced_features_reference_point(df_processed, use_processed_feature
     print(f"  Enhanced features: {enhanced_features}")
     print(f"  New features created: {new_features}")
     print(f"  Output shape: {df_enhanced.shape}")
+    
+    # Debug: Show some example features created (before merge, so no _swan suffix yet)
+    swan_max_features = [col for col in df_enhanced.columns if 'swh_max' in col and 'ma_' in col]
+    swh_features = [col for col in df_enhanced.columns if 'swh_' in col and 'ma_' in col]
+    
+    print(f"\n📊 Example SWAN features created (before merge):")
+    print(f"  swh_max moving averages: {len(swan_max_features)} features")
+    for feature in sorted(swan_max_features)[:5]:
+        print(f"    - {feature}")
+    if len(swan_max_features) > 5:
+        print(f"    ... and {len(swan_max_features) - 5} more")
+    
+    print(f"  All swh_ moving averages: {len(swh_features)} features")
+    for feature in sorted(swh_features)[:5]:
+        print(f"    - {feature}")
+    if len(swh_features) > 5:
+        print(f"    ... and {len(swh_features) - 5} more")
+    
+    print(f"\n💡 Note: After merge, these will become:")
+    print(f"    - swh_max_ma_7 → swh_max_ma_7_swan")
+    print(f"    - swh_max_trend_3 → swh_max_trend_3_swan")
+    print(f"    - swh_max_abs_change_3 → swh_max_abs_change_3_swan")
+    
     return df_enhanced
 
 
@@ -280,12 +329,35 @@ def main():
     df_swan_processed = detrend_and_deseasonalize_reference_point(df_swan_daily)
     # Step 3: Enhanced feature engineering
     df_swan_features = create_enhanced_features_reference_point(df_swan_processed)
-    # Step 4: Merge with WAVERYS
-    print("\nSTEP 4: Merging with WAVERYS data")
+    # Step 4: Add _swan suffix to all SWAN features before merge
+    print("\nSTEP 4: Adding _swan suffix to SWAN features")
+    
+    # Get all columns except date, port_name, and event_dummy_1
+    swan_columns = [col for col in df_swan_features.columns 
+                   if col not in ['date', 'port_name', 'event_dummy_1']]
+    
+    # Create mapping for renaming
+    rename_mapping = {}
+    for col in swan_columns:
+        if not col.endswith('_swan'):
+            rename_mapping[col] = f"{col}_swan"
+    
+    # Apply renaming
+    if rename_mapping:
+        df_swan_features = df_swan_features.rename(columns=rename_mapping)
+        print(f"✅ Renamed {len(rename_mapping)} SWAN features with _swan suffix")
+        print(f"  Example renames:")
+        for old_name, new_name in list(rename_mapping.items())[:5]:
+            print(f"    {old_name} → {new_name}")
+        if len(rename_mapping) > 5:
+            print(f"    ... and {len(rename_mapping) - 5} more")
+    
+    # Step 5: Merge with WAVERYS
+    print("\nSTEP 5: Merging with WAVERYS data")
     df_swan_features['port_name'] = reference_port
-    merged = pd.merge(df_swan_features, df_waverys_daily, on=['date', 'port_name'], suffixes=('_swan', '_waverys'), how='inner')
+    merged = pd.merge(df_swan_features, df_waverys_daily, on=['date', 'port_name'], how='inner')
     print(f"Merged dataset shape: {merged.shape}")
-    # Step 5: Save outputs
+    # Step 6: Save outputs
     swan_features_path = os.path.join(output_dir, 'df_swan_daily_features.csv')
     merged_path = os.path.join(output_dir, 'df_swan_waverys_merged.csv')
     df_swan_features.to_csv(swan_features_path, index=False)

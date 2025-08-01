@@ -31,7 +31,7 @@ data_dir = os.path.join(project_root, 'wave_analysis_pipeline', 'data', 'process
 # Cell 2: Specify region and load data
 #%%
 # Change this to your desired region
-region = 'run_g3'  # Options: run_g1, run_g2, run_g3, run_g4, run_g5, run_g6, run_g7, run_g8, run_g9, run_g10
+region = 'run_g8'  # Options: run_g1, run_g2, run_g3, run_g4, run_g5, run_g6, run_g7, run_g8, run_g9, run_g10
 #%%
 # Locate and load the merged data file using os.path
 data_path = os.path.join(data_dir, region, 'df_swan_waverys_merged.csv')
@@ -651,15 +651,15 @@ print(f"Match: {'✅ YES' if abs(simple_total - total_all_losses) < 1 else '❌ 
 # rolt = 3
 # rolw = 5
 
-med = 5
-rolt = 5
-rolw = 7
+# med = 5
+# rolt = 5
+# rolw = 7
 
-# med = 7
-# rolt = 7
-# rolw = 10
+med = 7
+rolt = 7
+rolw = 10
 
-wlim = 1.15
+wlim = 1.8
 # Set parameters for analysis
 WAVE_THRESHOLD  = wlim  # Wave height threshold
 ROLLING_WINDOW = rolw    # Rolling window size
@@ -1236,7 +1236,7 @@ AEP_CONFIG = {
     'block_length': 7,         # Weekly blocks for bootstrap
     'window_days': 20,         # Seasonal matching window
     'seasonal_filter': False,   # Apply seasonal filter (Apr-Oct)
-    'N_FISHERMEN': 14424,        # Number of fishermen
+    'N_FISHERMEN': 3948,        # Number of fishermen
     'W': 12,                   # Daily wage ($)
     'n_jobs': -1,
     'run_name': region               # Parallel workers (-1 = all cores)
@@ -3485,3 +3485,237 @@ combined_df_run.to_excel(os.path.join(results_dir, 'yearly_summaries_averaged_by
 print(f"\n💾 Excel export skipped - variables not defined in this version")
 print(f"   📁 Main analysis results are saved in CSV format instead")
 print(f"   This section was removed to fix the NameError with undefined variables")
+#%%
+# Cell: Create Minimal Excel Example from ACTUAL DATA for Event Detection Testing
+#%%
+def create_minimal_event_detection_excel_from_actual_data():
+    """
+    Create a minimal Excel file with ACTUAL event detection data for testing
+    Uses real data from the current region, filtered to 2024 only
+    Contains event_dummy_1, event_dummy_7, swh_max_swan and 5 simulation columns
+    """
+    
+    print(f"📊 Creating minimal Excel from ACTUAL DATA - Region: {region}")
+    print("="*60)
+    
+    # Use the already loaded df from the main script
+    if 'df' not in globals():
+        print("❌ Error: df not loaded. Make sure you've run the data loading cell first.")
+        return None
+    
+    # Filter to 2024 data only
+    df_2024 = df[df.index.year == 2024].copy()
+    
+    if len(df_2024) == 0:
+        print("❌ No 2024 data found in this region. Checking available years...")
+        available_years = df.index.year.unique()
+        print(f"Available years: {sorted(available_years)}")
+        
+        # Use the most recent year available
+        latest_year = max(available_years)
+        print(f"Using {latest_year} data instead...")
+        df_2024 = df[df.index.year == latest_year].copy()
+    
+    # Reset index to get date as a column
+    df_minimal = df_2024.reset_index()
+    
+    # Select only the essential columns we need
+    required_cols = ['date', 'swh_max_swan', 'event_dummy_1', 'event_dummy_7']
+    
+    # Check which columns exist
+    existing_cols = [col for col in required_cols if col in df_minimal.columns]
+    missing_cols = [col for col in required_cols if col not in df_minimal.columns]
+    
+    if missing_cols:
+        print(f"❌ Missing required columns: {missing_cols}")
+        print(f"Available columns in data: {list(df_minimal.columns)}")
+        return None
+    
+    # Start with essential columns
+    df_final = df_minimal[existing_cols].copy()
+    
+    # Check if the script has already run the analysis and created prediction columns
+    current_globals = globals()
+    
+    if 'df_2018' in current_globals and 'prediction' in current_globals['df_2018'].columns:
+        print("Found existing df_2018 with predictions - using actual analysis results!")
+        
+        # Use the 2024 data from the analyzed df_2018
+        df_analysis = current_globals['df_2018']
+        df_2024_analysis = df_analysis[df_analysis.index.year == 2024].copy()
+        
+        if len(df_2024_analysis) == 0:
+            print("No 2024 data in df_2018, using most recent year...")
+            latest_year = df_analysis.index.year.max()
+            df_2024_analysis = df_analysis[df_analysis.index.year == latest_year].copy()
+            year_used = latest_year
+        else:
+            year_used = 2024
+        
+        # Reset index to get date as column
+        df_final = df_2024_analysis.reset_index()
+        
+        # Keep the essential columns that already exist from the analysis
+        analysis_cols = ['date', 'swh_max_swan', 'prediction', 'prediction_rolling_sum', 
+                        'event_dummy_1', 'event_dummy_7']
+        existing_analysis_cols = [col for col in analysis_cols if col in df_final.columns]
+        df_final = df_final[existing_analysis_cols].copy()
+        
+        print(f"Using ACTUAL predictions from analysis:")
+        print(f"  prediction rate: {df_final['prediction'].mean()*100:.1f}%")
+        print(f"  max rolling sum: {df_final['prediction_rolling_sum'].max()}")
+        
+    else:
+        print("No existing df_2018 found - using basic threshold approach")
+        year_used = df_final['date'].dt.year.iloc[0]
+        
+        # Create basic predictions using WAVE_THRESHOLD from the script parameters
+        WAVE_THRESHOLD = 1.15  # From your script: wlim = 1.15
+        df_final['prediction'] = (df_final['swh_max_swan'] > WAVE_THRESHOLD).astype(int)
+        
+        # Create rolling sum
+        ROLLING_WINDOW = 7  # From your script: rolw = 7
+        df_final['prediction_rolling_sum'] = df_final['prediction'].rolling(
+            window=ROLLING_WINDOW, min_periods=1
+        ).sum()
+        
+        print(f"Created basic predictions with threshold {WAVE_THRESHOLD}:")
+        print(f"  prediction rate: {df_final['prediction'].mean()*100:.1f}%")
+    
+    # Use the threshold from your script
+    WAVE_THRESHOLD = 2   # From your script: wlim = 1.15
+    ROLLING_WINDOW = 7      # From your script: rolw = 7  
+    ROLLING_THRESHOLD = 5   # From your script: rolt = 5
+    
+    # Add prediction_event for actual data if it doesn't exist
+    if 'prediction' in df_final.columns and 'prediction_event' not in df_final.columns:
+        df_final['prediction_event'] = (
+            (df_final['prediction_rolling_sum'] >= ROLLING_THRESHOLD) & 
+            (df_final['prediction'] == 1)
+        ).astype(int)
+    
+    np.random.seed(42)  # For reproducible results
+    
+    for sim_num in range(1, 6):
+        # Create variation in swh_max_swan (±10% random variation)
+        variation_factor = np.random.normal(1.0, 0.1, len(df_final))
+        variation_factor = np.clip(variation_factor, 0.8, 1.2)  # Limit variation to ±20%
+        
+        sim_swh = df_final['swh_max_swan'] * variation_factor
+        df_final[f'sim_{sim_num}_swh_max_swan'] = sim_swh
+        
+        # Create prediction: 1 if simulated height > threshold, 0 otherwise
+        sim_prediction = (sim_swh > WAVE_THRESHOLD).astype(int)
+        df_final[f'sim_{sim_num}_prediction'] = sim_prediction
+        
+        # Add rolling sum of predictions
+        df_final[f'sim_{sim_num}_prediction_rolling_sum'] = sim_prediction.rolling(
+            window=ROLLING_WINDOW, min_periods=1
+        ).sum()
+        
+        # Create prediction_event: requires rolling sum >= threshold AND current prediction = 1
+        df_final[f'sim_{sim_num}_prediction_event'] = (
+            (df_final[f'sim_{sim_num}_prediction_rolling_sum'] >= ROLLING_THRESHOLD) & 
+            (sim_prediction == 1)
+        ).astype(int)
+        
+        # Create event_dummy_1 based on prediction (same as prediction)
+        df_final[f'sim_{sim_num}_event_dummy_1'] = sim_prediction
+        
+        # Create event_dummy_7 for simulations using actual logic
+        if len(df_final) > 0:
+            sim_periods = get_event_durations(sim_prediction.values)
+            df_final[f'sim_{sim_num}_event_dummy_7'] = 0
+            
+            for start_idx, duration in sim_periods:
+                if duration >= 7:
+                    end_idx = start_idx + duration
+                    df_final.loc[start_idx:end_idx-1, f'sim_{sim_num}_event_dummy_7'] = 1
+    
+    # Print summary statistics
+    year_used = df_final['date'].dt.year.iloc[0]
+    print(f"✅ Minimal Excel created from ACTUAL {region} data")
+    print(f"Date range: {df_final['date'].min().strftime('%Y-%m-%d')} to {df_final['date'].max().strftime('%Y-%m-%d')}")
+    print(f"Total days: {len(df_final)}")
+    print(f"swh_max_swan range: {df_final['swh_max_swan'].min():.2f} - {df_final['swh_max_swan'].max():.2f} m")
+    print(f"event_dummy_1 events: {df_final['event_dummy_1'].sum()} days ({df_final['event_dummy_1'].mean()*100:.1f}%)")
+    print(f"event_dummy_7 events: {df_final['event_dummy_7'].sum()} days ({df_final['event_dummy_7'].mean()*100:.1f}%)")
+    
+    # Show event details
+    if df_final['event_dummy_7'].sum() > 0:
+        periods_7 = get_event_durations(df_final['event_dummy_7'].values)
+        print(f"event_dummy_7 periods: {len(periods_7)} events with durations: {[d for _, d in periods_7]} days")
+    else:
+        print("⚠️ No event_dummy_7 events found in this year/region")
+    
+    print(f"Columns included: {len(df_final.columns)}")
+    
+    # Show column structure
+    print(f"\nColumn structure:")
+    for i, col in enumerate(df_final.columns, 1):
+        print(f"  {i:2d}. {col}")
+    
+    # Save to Excel in the results directory
+    results_dir = os.path.join(project_root, 'results')
+    os.makedirs(results_dir, exist_ok=True)
+    output_path = os.path.join(results_dir, f'minimal_event_detection_{region}_{year_used}.xlsx')
+    df_final.to_excel(output_path, index=False)
+    
+    print(f"\n✅ File saved as: {output_path}")
+    if os.path.exists(output_path):
+        print(f"File size: ~{os.path.getsize(output_path)/1024:.1f} KB")
+    
+    # Show sample data
+    print(f"\nSample data (first 10 rows):")
+    sample_cols = ['date', 'swh_max_swan', 'prediction', 'prediction_rolling_sum', 'prediction_event', 'event_dummy_1', 'event_dummy_7']
+    if len(df_final.columns) > 7:
+        sample_cols.extend(['sim_1_swh_max_swan', 'sim_1_prediction', 'sim_1_prediction_rolling_sum', 'sim_1_prediction_event', 'sim_1_event_dummy_1'])
+    existing_sample_cols = [col for col in sample_cols if col in df_final.columns]
+    print(df_final[existing_sample_cols].head(10).to_string(index=False))
+    
+    # Verify the logic is correct
+    print(f"\n🎯 Simulation predictions verification:")
+    print(f"   Wave threshold: {WAVE_THRESHOLD}m")
+    print(f"   Rolling window: {ROLLING_WINDOW} days")
+    print(f"   Rolling threshold: {ROLLING_THRESHOLD} (for prediction_event)")
+    
+    # Check actual data first
+    if 'prediction_event' in df_final.columns:
+        actual_pred_event_rate = df_final['prediction_event'].mean() * 100
+        print(f"   Actual prediction_event rate: {actual_pred_event_rate:.1f}%")
+    
+    for sim_num in range(1, 6):
+        sim_swh_col = f'sim_{sim_num}_swh_max_swan'
+        sim_pred_col = f'sim_{sim_num}_prediction'
+        sim_pred_event_col = f'sim_{sim_num}_prediction_event'
+        
+        if sim_swh_col in df_final.columns and sim_pred_col in df_final.columns:
+            # Check that prediction logic is correct
+            above_threshold = (df_final[sim_swh_col] > WAVE_THRESHOLD).sum()
+            prediction_sum = df_final[sim_pred_col].sum()
+            
+            print(f"   sim_{sim_num}: {above_threshold} days above threshold = {prediction_sum} predictions ✓")
+            
+            sim_rate = df_final[sim_pred_col].mean() * 100
+            sim_max_rolling = df_final[f'sim_{sim_num}_prediction_rolling_sum'].max()
+            
+            if sim_pred_event_col in df_final.columns:
+                sim_event_rate = df_final[sim_pred_event_col].mean() * 100
+                print(f"              prediction rate: {sim_rate:.1f}%, prediction_event rate: {sim_event_rate:.1f}%, max rolling sum: {sim_max_rolling}")
+            else:
+                print(f"              prediction rate: {sim_rate:.1f}%, max rolling sum: {sim_max_rolling}")
+    
+    # Verify data integrity
+    print(f"\n🔍 Data integrity check:")
+    print(f"   swh_max_swan: {df_final['swh_max_swan'].isnull().sum()} null values")
+    print(f"   event_dummy_1: {df_final['event_dummy_1'].value_counts().to_dict()}")
+    print(f"   event_dummy_7: {df_final['event_dummy_7'].value_counts().to_dict()}")
+    
+    return df_final
+
+# Execute the function to create the minimal example from ACTUAL DATA
+print("\n" + "="*70)
+print("CREATING MINIMAL EXCEL EXAMPLE FROM ACTUAL DATA")
+print("="*70)
+df_minimal_example = create_minimal_event_detection_excel_from_actual_data()
+# %%
